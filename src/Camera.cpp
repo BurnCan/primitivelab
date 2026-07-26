@@ -210,18 +210,44 @@ void FPSCamera::ProcessInput(GLFWwindow* window, float deltaTime) {
         return;
     }
 
-    // Remove only the part of the requested movement that points into a
-    // collision surface. The remaining tangent component lets the camera
-    // glide along walls and slopes; a perpendicular impact naturally has no
-    // tangent component and therefore still comes to a stop.
+    // Move up to the point of impact before removing the part of the remaining
+    // movement that points into the surface. Projecting the complete movement
+    // from the original position leaves its end point inside the collision
+    // volume. That is particularly noticeable at a convex edge: each adjacent
+    // face can reject the projected end point, making the camera stop instead
+    // of travelling around the edge.
     glm::vec3 remaining = movement;
-    for (int iteration = 0; iteration < 3 && glm::dot(remaining, remaining) > 0.0000001f; ++iteration) {
+    constexpr int maxSlideIterations = 5;
+    constexpr int sweepIterations = 12;
+    constexpr float minimumMovementSquared = 0.0000001f;
+    for (int iteration = 0;
+         iteration < maxSlideIterations && glm::dot(remaining, remaining) > minimumMovementSquared;
+         ++iteration) {
         const glm::vec3 proposed = Position + remaining;
         glm::vec3 contactNormal(0.0f);
         if (!scene->CheckCollision(proposed, FPS_CAMERA_COLLISION_RADIUS, &contactNormal)) {
             Position = proposed;
             break;
         }
+
+        // Find the last collision-free point on this movement segment so the
+        // tangent movement begins at a stable contact point.
+        float safeFraction = 0.0f;
+        float collidingFraction = 1.0f;
+        for (int sweep = 0; sweep < sweepIterations; ++sweep) {
+            const float testFraction = (safeFraction + collidingFraction) * 0.5f;
+            glm::vec3 testNormal(0.0f);
+            if (scene->CheckCollision(Position + remaining * testFraction,
+                                      FPS_CAMERA_COLLISION_RADIUS, &testNormal)) {
+                collidingFraction = testFraction;
+                contactNormal = testNormal;
+            } else {
+                safeFraction = testFraction;
+            }
+        }
+
+        Position += remaining * safeFraction;
+        remaining *= 1.0f - safeFraction;
 
         const float intoSurface = glm::dot(remaining, contactNormal);
         if (intoSurface >= 0.0f || glm::dot(contactNormal, contactNormal) < 0.5f)
