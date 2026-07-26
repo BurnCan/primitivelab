@@ -106,6 +106,35 @@ target_include_directories(Editor PRIVATE ${COMMON_INCLUDE} ${imgui_SOURCE_DIR} 
 target_link_libraries(Editor PRIVATE glfw)
 
 # -------------------
+# Runtime assets
+# -------------------
+# The applications load assets from ../<asset-directory>.  Keep that layout
+# relative to each executable so they do not depend on the source tree or on
+# the directory from which CMake was invoked.
+function(copy_runtime_assets target)
+    foreach(asset_directory IN ITEMS shaders textures scenes)
+        add_custom_command(
+            TARGET ${target}
+            POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                    "${CMAKE_SOURCE_DIR}/${asset_directory}"
+                    "$<TARGET_FILE_DIR:${target}>/../${asset_directory}"
+            COMMENT "Copying ${asset_directory} assets for ${target}"
+            VERBATIM
+        )
+    endforeach()
+
+    # Match the runtime layout when launching from Visual Studio.
+    set_property(
+        TARGET ${target}
+        PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_FILE_DIR:${target}>"
+    )
+endfunction()
+
+copy_runtime_assets(Game)
+copy_runtime_assets(Editor)
+
+# -------------------
 # Platform-specific libraries
 # -------------------
 
