@@ -38,7 +38,7 @@ const std::string SHADER_DIR = "../shaders/";
 #define PITCH   0.0f
 
 //Bounding box
-static bool showBoundingBoxes = false;
+static bool showCollisionMeshes = false;
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
     SCR_WIDTH = width;
@@ -410,8 +410,8 @@ if (sceneFocused) {
                        SCR_HEIGHT);
 
         // Draw bounding boxes (optional debug overlay)
-        if (showBoundingBoxes) {
-            sceneManager.DrawBoundingBoxes(boundingBoxShader,
+        if (showCollisionMeshes) {
+            sceneManager.DrawCollisionMeshes(boundingBoxShader,
                 useFPSCamera ? fpsCamera : editorCamera,
                 SCR_WIDTH, SCR_HEIGHT);
         }
@@ -542,7 +542,7 @@ ImGui::Separator();
 ImGui::Text("Frame Time: %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
 
 // Bounding box toggle
-ImGui::Checkbox("Show Bounding Boxes", &showBoundingBoxes);
+ImGui::Checkbox("Show Collision Meshes", &showCollisionMeshes);
 
 // Optional: Add wireframe toggle
 static bool wireframeMode = false;

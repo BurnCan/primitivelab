@@ -70,7 +70,6 @@ bool SceneManager::loadScene(const std::string& path) {
             light.color    = glm::vec3(r, g, b);
             lights.push_back(light);
         }
-        UpdateBoundingBoxes();
     }
 
     return true;
@@ -173,29 +172,10 @@ void SceneManager::drawScene(const Shader& shader, Camera& camera, int width, in
 
 
 
-void SceneManager::UpdateBoundingBoxes() {
-    boundingBoxes.clear();
-
-    // Add terrain AABB (flat plane)
-    AABB terrainBox;
-    terrainBox.min = glm::vec3(-10.0f, -0.1f, -10.0f);
-    terrainBox.max = glm::vec3(10.0f, 0.1f, 10.0f);
-    boundingBoxes.push_back(terrainBox);
-
-    // Add primitives
-    for (const auto& prim : primitives) {
-        glm::vec3 halfScale = prim->scale * 0.5f;
-        glm::vec3 min = prim->position - halfScale;
-        glm::vec3 max = prim->position + halfScale;
-        boundingBoxes.push_back({ min, max });
-    }
-}
-
 bool SceneManager::CheckCollision(const glm::vec3& point, float radius) {
-    for (const auto& box : boundingBoxes) {
-        if (box.IntersectsSphere(point, radius)) {
-            return true;
-        }
+    for (const auto& primitive : primitives) {
+        primitive->UpdateModelMatrix();
+        if (primitive->IntersectsSphere(point, radius)) return true;
     }
     return false;
 }
@@ -227,12 +207,11 @@ void SceneManager::drawLights(const Shader& lightShader, Camera& camera, int wid
 }
 
 
-void SceneManager::DrawBoundingBoxes(const Shader& shader, const Camera& camera, int width, int height)
+void SceneManager::DrawCollisionMeshes(const Shader& shader, const Camera& camera, int width, int height)
 {
     // Backup minimal GL state we change
     GLint polygonMode[2];
-glGetIntegerv(GL_POLYGON_MODE, polygonMode);
-std::cout << "POLYMODE START: " << polygonMode[0] << std::endl;
+    glGetIntegerv(GL_POLYGON_MODE, polygonMode);
     GLboolean depthTestEnabled = glIsEnabled(GL_DEPTH_TEST);
     GLboolean cullFaceEnabled = glIsEnabled(GL_CULL_FACE);
     GLint prevArrayBuffer = 0; glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &prevArrayBuffer);
@@ -266,51 +245,10 @@ std::cout << "POLYMODE START: " << polygonMode[0] << std::endl;
     for (const auto& primPtr : primitives)
     {
         const Primitive& prim = *primPtr;
-        const glm::vec3& min = prim.boundingBox.min;
-        const glm::vec3& max = prim.boundingBox.max;
-
-        // Model is primitive's modelMatrix (updated by UpdateModelMatrix)
+        const_cast<Primitive&>(prim).UpdateModelMatrix();
         glm::mat4 model = prim.modelMatrix;
         mutableShader.SetMat4("model", model);
-
-        // Build 8 corners in local space
-        glm::vec3 corners[8] = {
-            {min.x, min.y, min.z}, {max.x, min.y, min.z},
-            {max.x, max.y, min.z}, {min.x, max.y, min.z},
-            {min.x, min.y, max.z}, {max.x, min.y, max.z},
-            {max.x, max.y, max.z}, {min.x, max.y, max.z}
-        };
-
-        // Indices for 12 edges (24 index entries)
-        const unsigned int indices[24] = {
-            0,1, 1,2, 2,3, 3,0, // bottom
-            4,5, 5,6, 6,7, 7,4, // top
-            0,4, 1,5, 2,6, 3,7  // sides
-        };
-
-        // Upload corner positions to a tiny temporary VBO (cheap)
-        GLuint tmpVAO=0, tmpVBO=0, tmpEBO=0;
-        glGenVertexArrays(1, &tmpVAO);
-        glGenBuffers(1, &tmpVBO);
-        glGenBuffers(1, &tmpEBO);
-
-        glBindVertexArray(tmpVAO);
-        glBindBuffer(GL_ARRAY_BUFFER, tmpVBO);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(corners), corners, GL_STATIC_DRAW);
-
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tmpEBO);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void*)0);
-
-        glDrawElements(GL_LINES, 24, GL_UNSIGNED_INT, 0);
-
-        // cleanup
-        glBindVertexArray(0);
-        glDeleteBuffers(1, &tmpVBO);
-        glDeleteBuffers(1, &tmpEBO);
-        glDeleteVertexArrays(1, &tmpVAO);
+        prim.drawWireframe();
     }
 
     // restore depth mask and polygon mode and bindings
@@ -327,52 +265,4 @@ std::cout << "POLYMODE START: " << polygonMode[0] << std::endl;
 
     glUseProgram(0);
 
-    glGetIntegerv(GL_POLYGON_MODE, polygonMode);
-std::cout << "POLYMODE END: " << polygonMode[0] << std::endl;
-
 }
-
-
-
-
-
-
-
-void SceneManager::InitDebugCube()
-{
-    if (debugVAO != 0) return;
-
-    float vertices[] = {
-        // 12 edges * 2 points = 24 vertices
-        -0.5f, -0.5f, -0.5f,  0.5f, -0.5f, -0.5f,
-         0.5f, -0.5f, -0.5f,  0.5f,  0.5f, -0.5f,
-         0.5f,  0.5f, -0.5f, -0.5f,  0.5f, -0.5f,
-        -0.5f,  0.5f, -0.5f, -0.5f, -0.5f, -0.5f,
-
-        -0.5f, -0.5f,  0.5f,  0.5f, -0.5f,  0.5f,
-         0.5f, -0.5f,  0.5f,  0.5f,  0.5f,  0.5f,
-         0.5f,  0.5f,  0.5f, -0.5f,  0.5f,  0.5f,
-        -0.5f,  0.5f,  0.5f, -0.5f, -0.5f,  0.5f,
-
-        -0.5f, -0.5f, -0.5f, -0.5f, -0.5f,  0.5f,
-         0.5f, -0.5f, -0.5f,  0.5f, -0.5f,  0.5f,
-         0.5f,  0.5f, -0.5f,  0.5f,  0.5f,  0.5f,
-        -0.5f,  0.5f, -0.5f, -0.5f,  0.5f,  0.5f
-    };
-
-    GLuint VBO;
-    glGenVertexArrays(1, &debugVAO);
-    glGenBuffers(1, &VBO);
-
-    glBindVertexArray(debugVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-
-    glBindVertexArray(0);
-}
-
-
-
-

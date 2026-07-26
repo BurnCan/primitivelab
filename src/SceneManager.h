@@ -13,23 +13,6 @@ struct Light {
     glm::vec3 color;
 };
 
-struct AABB {
-    glm::vec3 min;
-    glm::vec3 max;
-
-
-
-   bool IntersectsSphere(const glm::vec3& center, float radius) const {
-    // Clamp sphere center to box boundaries
-    glm::vec3 closest = glm::clamp(center, min, max);
-
-    // Compute squared distance manually (faster than glm::distance)
-    glm::vec3 diff = center - closest;
-    float distanceSquared = glm::dot(diff, diff);
-
-    return distanceSquared < (radius * radius);
-}
-};
 class Camera; // 👈 Add this forward declaration
 
 class SceneManager {
@@ -50,8 +33,7 @@ public:
 
 
     void DrawDebugWindow();
-    bool showBoundingBoxes = false; // Debug toggle
-    void DrawBoundingBoxes(const Shader& shader, const Camera& camera, int width, int height);
+    void DrawCollisionMeshes(const Shader& shader, const Camera& camera, int width, int height);
 
 
 
@@ -72,7 +54,6 @@ public:
     primitives.clear();
     lights.clear();
     }
-     void UpdateBoundingBoxes();
     void AddLight(const Light& light) { lights.push_back(light); }
 
 private:
@@ -81,10 +62,4 @@ private:
     Primitive lightSphere { PrimitiveType::Sphere, "sun.jpg" }; // reusable light sphere
     std::string currentSceneFile; // ✅ track the currently opened scene
     Terrain terrain;   // member terrain
-    std::vector<AABB> boundingBoxes;
-
-
-    GLuint debugVAO = 0, debugVBO = 0;
-    void InitDebugCube();
-
 };
