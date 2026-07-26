@@ -34,7 +34,8 @@ public:
 
 
     void DrawDebugWindow();
-    void DrawCollisionMeshes(const Shader& shader, const Camera& camera, int width, int height);
+    void DrawCollisionMeshes(const Shader& shader, const Camera& camera, int width, int height,
+                             bool drawPrimitiveMeshes = true, bool drawTerrainMesh = false);
 
 
 

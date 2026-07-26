@@ -174,6 +174,8 @@ void SceneManager::drawScene(const Shader& shader, Camera& camera, int width, in
 
 bool SceneManager::CheckCollision(const glm::vec3& point, float radius,
                                   glm::vec3* contactNormal) {
+    if (terrain.IntersectsSphere(point, radius, contactNormal)) return true;
+
     for (const auto& primitive : primitives) {
         primitive->UpdateModelMatrix();
         if (primitive->IntersectsSphere(point, radius, contactNormal)) return true;
@@ -208,7 +210,8 @@ void SceneManager::drawLights(const Shader& lightShader, Camera& camera, int wid
 }
 
 
-void SceneManager::DrawCollisionMeshes(const Shader& shader, const Camera& camera, int width, int height)
+void SceneManager::DrawCollisionMeshes(const Shader& shader, const Camera& camera, int width, int height,
+                                       bool drawPrimitiveMeshes, bool drawTerrainMesh)
 {
     // Backup minimal GL state we change
     GLint polygonMode[2];
@@ -243,13 +246,20 @@ void SceneManager::DrawCollisionMeshes(const Shader& shader, const Camera& camer
     // Optionally enable line smoothing if desired (not necessary)
     // glEnable(GL_LINE_SMOOTH);
 
-    for (const auto& primPtr : primitives)
-    {
-        const Primitive& prim = *primPtr;
-        const_cast<Primitive&>(prim).UpdateModelMatrix();
-        glm::mat4 model = prim.modelMatrix;
-        mutableShader.SetMat4("model", model);
-        prim.drawWireframe();
+    if (drawPrimitiveMeshes) {
+        for (const auto& primPtr : primitives)
+        {
+            const Primitive& prim = *primPtr;
+            const_cast<Primitive&>(prim).UpdateModelMatrix();
+            mutableShader.SetMat4("model", prim.modelMatrix);
+            prim.drawWireframe();
+        }
+    }
+
+    if (drawTerrainMesh) {
+        mutableShader.SetVec3("color", glm::vec3(1.0f, 0.65f, 0.0f));
+        mutableShader.SetMat4("model", glm::mat4(1.0f));
+        terrain.DrawWireframe();
     }
 
     // restore depth mask and polygon mode and bindings

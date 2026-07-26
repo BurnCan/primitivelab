@@ -40,6 +40,7 @@ const std::string SHADER_DIR = ResolveAssetPath("basic.vert", "shaders").parent_
 
 //Bounding box
 static bool showCollisionMeshes = false;
+static bool showTerrainMesh = false;
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
     SCR_WIDTH = width;
@@ -411,10 +412,10 @@ if (sceneFocused) {
                        SCR_HEIGHT);
 
         // Draw bounding boxes (optional debug overlay)
-        if (showCollisionMeshes) {
+        if (showCollisionMeshes || showTerrainMesh) {
             sceneManager.DrawCollisionMeshes(boundingBoxShader,
                 useFPSCamera ? fpsCamera : editorCamera,
-                SCR_WIDTH, SCR_HEIGHT);
+                SCR_WIDTH, SCR_HEIGHT, showCollisionMeshes, showTerrainMesh);
         }
 
 
@@ -543,6 +544,7 @@ ImGui::Text("Frame Time: %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.F
 
 // Bounding box toggle
 ImGui::Checkbox("Show Collision Meshes", &showCollisionMeshes);
+ImGui::Checkbox("Show Terrain Mesh", &showTerrainMesh);
 
 // Optional: Add wireframe toggle
 static bool wireframeMode = false;
