@@ -186,21 +186,72 @@ FPSCamera::FPSCamera(SceneManager* sceneManager,
 
 // --- Collision-aware keyboard ---
 void FPSCamera::ProcessInput(GLFWwindow* window, float deltaTime) {
-    float velocity = MovementSpeed * deltaTime;
+    // Avoid an unusually long frame turning into a large physics step.
+    const float frameTime = std::min(deltaTime, 0.05f);
+    const float velocity = MovementSpeed * frameTime;
     glm::vec3 movement(0.0f);
 
+    // FPS movement stays parallel to the ground even while looking up/down.
+    glm::vec3 forward(Front.x, 0.0f, Front.z);
+    if (glm::dot(forward, forward) > 0.0001f)
+        forward = glm::normalize(forward);
+    glm::vec3 right(Right.x, 0.0f, Right.z);
+    if (glm::dot(right, right) > 0.0001f)
+        right = glm::normalize(right);
+
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-        movement += Front * velocity;
+        movement += forward;
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-        movement -= Front * velocity;
+        movement -= forward;
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-        movement -= Right * velocity;
+        movement -= right;
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-        movement += Right * velocity;
-    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
-        movement.y += velocity;
-    if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
-        movement.y -= velocity;
+        movement += right;
+    if (glm::dot(movement, movement) > 1.0f)
+        movement = glm::normalize(movement);
+    movement *= velocity;
+
+    const bool crouchPressed =
+        glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS ||
+        glfwGetKey(window, GLFW_KEY_RIGHT_CONTROL) == GLFW_PRESS;
+
+    // Keep the bottom of the collision volume fixed while changing height.
+    // Standing is refused when there is not enough headroom.
+    if (crouchPressed && !IsCrouching) {
+        Position.y -= FPS_CAMERA_COLLISION_RADIUS - FPS_CAMERA_CROUCH_RADIUS;
+        CollisionRadius = FPS_CAMERA_CROUCH_RADIUS;
+        IsCrouching = true;
+    } else if (!crouchPressed && IsCrouching) {
+        const float heightDifference = FPS_CAMERA_COLLISION_RADIUS - FPS_CAMERA_CROUCH_RADIUS;
+        const glm::vec3 standingPosition = Position + glm::vec3(0.0f, heightDifference, 0.0f);
+        if (!scene || !scene->CheckCollision(standingPosition, FPS_CAMERA_COLLISION_RADIUS)) {
+            Position = standingPosition;
+            CollisionRadius = FPS_CAMERA_COLLISION_RADIUS;
+            IsCrouching = false;
+        }
+    }
+
+    // A short downward probe makes grounding stable when the sphere is resting
+    // exactly against a floor (which is not itself an intersection).
+    constexpr float groundProbeDistance = 0.03f;
+    glm::vec3 groundNormal(0.0f);
+    IsGrounded = scene && scene->CheckCollision(
+        Position - glm::vec3(0.0f, groundProbeDistance, 0.0f),
+        CollisionRadius, &groundNormal) && groundNormal.y > 0.5f;
+
+    const bool jumpPressed = glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS;
+    if (jumpPressed && !jumpWasPressed && IsGrounded) {
+        VerticalVelocity = FPS_JUMP_SPEED;
+        IsGrounded = false;
+    }
+    jumpWasPressed = jumpPressed;
+
+    if (!IsGrounded)
+        VerticalVelocity -= FPS_GRAVITY * frameTime;
+    else if (VerticalVelocity < 0.0f)
+        VerticalVelocity = 0.0f;
+
+    movement.y = VerticalVelocity * frameTime;
 
     // The collision volume must enclose the camera's near clipping plane, not
     // merely the view position, or surfaces can be clipped before the point at
@@ -225,7 +276,7 @@ void FPSCamera::ProcessInput(GLFWwindow* window, float deltaTime) {
          ++iteration) {
         const glm::vec3 proposed = Position + remaining;
         glm::vec3 contactNormal(0.0f);
-        if (!scene->CheckCollision(proposed, FPS_CAMERA_COLLISION_RADIUS, &contactNormal)) {
+        if (!scene->CheckCollision(proposed, CollisionRadius, &contactNormal)) {
             Position = proposed;
             break;
         }
@@ -238,7 +289,7 @@ void FPSCamera::ProcessInput(GLFWwindow* window, float deltaTime) {
             const float testFraction = (safeFraction + collidingFraction) * 0.5f;
             glm::vec3 testNormal(0.0f);
             if (scene->CheckCollision(Position + remaining * testFraction,
-                                      FPS_CAMERA_COLLISION_RADIUS, &testNormal)) {
+                                      CollisionRadius, &testNormal)) {
                 collidingFraction = testFraction;
                 contactNormal = testNormal;
             } else {
@@ -250,6 +301,12 @@ void FPSCamera::ProcessInput(GLFWwindow* window, float deltaTime) {
         remaining *= 1.0f - safeFraction;
 
         const float intoSurface = glm::dot(remaining, contactNormal);
+        if (contactNormal.y > 0.5f && VerticalVelocity < 0.0f) {
+            IsGrounded = true;
+            VerticalVelocity = 0.0f;
+        } else if (contactNormal.y < -0.5f && VerticalVelocity > 0.0f) {
+            VerticalVelocity = 0.0f;
+        }
         if (intoSurface >= 0.0f || glm::dot(contactNormal, contactNormal) < 0.5f)
             break;
 
