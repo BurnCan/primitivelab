@@ -465,14 +465,13 @@ if (sceneFocused) {
 
         ImGui::End();
 
-       // Refresh textures each frame (so newly added files show up immediately)
-//std::vector<std::string> textureFiles = GetAvailableTextures("../textures/");
-
 // === Primitive Editor Window ===
 ImGui::Begin("Primitives");
 
-// Refresh textures each frame
-std::vector<std::string> textureFiles = GetAvailableTextures("../textures/");
+// Refresh textures each frame. Resolve the relative asset directory instead of
+// assuming that the editor was launched from its executable directory.
+const std::filesystem::path textureDirectory = ResolveAssetPath("textures", "textures");
+std::vector<std::string> textureFiles = GetAvailableTextures(textureDirectory.string());
 
 auto& primitives = sceneManager.GetPrimitives();
 for (int i = 0; i < primitives.size(); ++i) {
@@ -509,7 +508,7 @@ for (int i = 0; i < primitives.size(); ++i) {
             for (auto& tex : textureFiles) {
                 bool selected = (tex == prim->GetTexturePath());
                 if (ImGui::Selectable(tex.c_str(), selected)) {
-                    prim->SetTexturePath("../textures/" + tex);
+                    prim->SetTexturePath((std::filesystem::path("textures") / tex).generic_string());
                 }
                 if (selected) ImGui::SetItemDefaultFocus();
             }
