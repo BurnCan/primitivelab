@@ -132,6 +132,11 @@ int main() {
         scene.AddLight(light);
     }
 
+    // Scene and shader loading can take long enough for the launching window to
+    // retain focus. Explicitly focus the game once startup is complete so key
+    // input (including WASD) works without requiring an initial mouse click.
+    glfwFocusWindow(window);
+
     // ---------------- Main Loop ----------------
     static bool tabWasDown = false;
     while (!glfwWindowShouldClose(window)) {
