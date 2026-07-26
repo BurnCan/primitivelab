@@ -11,6 +11,7 @@
 #include "Camera.h"
 #include "SceneManager.h"
 #include "ShaderUtils.h"
+#include "AssetPaths.h"
 
 namespace fs = std::filesystem;
 
@@ -23,8 +24,6 @@ float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
 // Shader directory
-const std::string SHADER_DIR = "../shaders/";
-
 // Framebuffer (optional)
 GLuint sceneFBO = 0;
 
@@ -99,8 +98,10 @@ int main() {
     // ---------------- Shader Programs ----------------
     //GLuint shaderProgram = CompileShaderProgram(SHADER_DIR + "basic.vert", SHADER_DIR + "basic.frag");
     //GLuint lightShaderProgram = CompileShaderProgram(SHADER_DIR + "light.vert", SHADER_DIR + "light.frag");
-    Shader shader(SHADER_DIR + "basic.vert", SHADER_DIR + "basic.frag");
-    Shader lightShader(SHADER_DIR + "light.vert", SHADER_DIR + "light.frag");
+    Shader shader(ResolveAssetPath("basic.vert", "shaders").string(),
+                  ResolveAssetPath("basic.frag", "shaders").string());
+    Shader lightShader(ResolveAssetPath("light.vert", "shaders").string(),
+                       ResolveAssetPath("light.frag", "shaders").string());
 
     // ---------------- SceneManager ----------------
     SceneManager scene;
@@ -117,7 +118,7 @@ int main() {
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
     // ---------------- Scene Load ----------------
-    if (!scene.loadScene("../scenes/default.txt")) {
+    if (!scene.loadScene(ResolveAssetPath("default.txt", "scenes").string())) {
         std::cout << "No scene found, creating default one...\n";
         scene.AddPrimitive(std::make_unique<Primitive>(PrimitiveType::Cube, "textures/brick.jpg"));
         scene.AddPrimitive(std::make_unique<Primitive>(PrimitiveType::TriangularPrism, "textures/wood.jpg"));

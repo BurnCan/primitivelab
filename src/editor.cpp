@@ -12,6 +12,7 @@
 #include "Camera.h"
 #include "SceneManager.h"
 #include "ShaderUtils.h"
+#include "AssetPaths.h"
 
 // ImGui
 #include "imgui.h"
@@ -29,7 +30,7 @@ float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
 // Shader directory
-const std::string SHADER_DIR = "../shaders/";
+const std::string SHADER_DIR = ResolveAssetPath("basic.vert", "shaders").parent_path().string() + "/";
 
 
 
@@ -120,7 +121,7 @@ int main() {
 SceneManager sceneManager;
 std::string currentSceneFile; // track currently loaded/saved scene path
 
-std::string defaultScenePath = "../scenes/default.txt";
+std::string defaultScenePath = ResolveAssetPath("default.txt", "scenes").string();
 if (sceneManager.loadScene(defaultScenePath)) {
     std::cout << "Loaded default scene: " << defaultScenePath << std::endl;
     currentSceneFile = defaultScenePath;
@@ -464,14 +465,13 @@ if (sceneFocused) {
 
         ImGui::End();
 
-       // Refresh textures each frame (so newly added files show up immediately)
-//std::vector<std::string> textureFiles = GetAvailableTextures("../textures/");
-
 // === Primitive Editor Window ===
 ImGui::Begin("Primitives");
 
-// Refresh textures each frame
-std::vector<std::string> textureFiles = GetAvailableTextures("../textures/");
+// Refresh textures each frame. Resolve the relative asset directory instead of
+// assuming that the editor was launched from its executable directory.
+const std::filesystem::path textureDirectory = ResolveAssetPath("textures", "textures");
+std::vector<std::string> textureFiles = GetAvailableTextures(textureDirectory.string());
 
 auto& primitives = sceneManager.GetPrimitives();
 for (int i = 0; i < primitives.size(); ++i) {
@@ -508,7 +508,7 @@ for (int i = 0; i < primitives.size(); ++i) {
             for (auto& tex : textureFiles) {
                 bool selected = (tex == prim->GetTexturePath());
                 if (ImGui::Selectable(tex.c_str(), selected)) {
-                    prim->SetTexturePath("../textures/" + tex);
+                    prim->SetTexturePath((std::filesystem::path("textures") / tex).generic_string());
                 }
                 if (selected) ImGui::SetItemDefaultFocus();
             }

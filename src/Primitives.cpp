@@ -6,6 +6,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <filesystem>
+#include "AssetPaths.h"
 namespace fs = std::filesystem;
 
 // Utility: list all available textures in a directory
@@ -469,7 +470,7 @@ void Primitive::setupTriangularPrism() {
 // ---------------- Texture loading ----------------
 void Primitive::loadTexture(const std::string& path) {
     // Resolve absolute path relative to current directory
-    fs::path texPath = fs::current_path().parent_path() /"textures"/ path;
+    fs::path texPath = ResolveAssetPath(path, "textures");
     std::cout << "[DEBUG] Attempting to load texture: " << texPath << std::endl;
 
     glGenTextures(1, &textureID);
