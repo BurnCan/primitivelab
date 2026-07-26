@@ -68,22 +68,12 @@ public:
     Primitive(PrimitiveType type, const std::string& texturePath,
               unsigned int xSeg, unsigned int ySeg);
     ~Primitive();
-    //Bounding box struct
-    struct BoundingBox {
-    glm::vec3 min;
-    glm::vec3 max;
-
-    // Simple helper to compute size and center
-    glm::vec3 GetCenter() const { return (min + max) * 0.5f; }
-    glm::vec3 GetSize() const { return max - min; }
-};
-
-BoundingBox boundingBox;
-void computeLocalBounds();
-
-
     // Draw
     void draw() const;
+    void drawWireframe() const;
+
+    // Tests a world-space sphere against the actual triangles in this mesh.
+    bool IntersectsSphere(const glm::vec3& center, float radius) const;
 
     // New: update model matrix from transform components
     void UpdateModelMatrix() {
@@ -128,6 +118,7 @@ private:
     GLsizei indexCount = 0;
 
     std::vector<float> localVertices; // stores full vertex data (x,y,z,nx,ny,nz,u,v)
+    std::vector<unsigned int> localIndices;
 
     unsigned int X_SEGMENTS = 32;
     unsigned int Y_SEGMENTS = 32;

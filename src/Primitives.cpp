@@ -151,6 +151,7 @@ Primitive::~Primitive() {
 //   8 = positions + normals + texcoords (used by Cube and Sphere)
 void Primitive::setupVAO(const std::vector<float>& vertices, const std::vector<unsigned int>& indices, int stride) {
     indexCount = static_cast<GLsizei>(indices.size());
+    localIndices = indices;
 
     glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);
@@ -375,7 +376,6 @@ void Primitive::setupSphere() {
     }
 
     setupVAO(localVertices, indices, 8);
-    computeLocalBounds();
 }
 
 
@@ -530,29 +530,6 @@ void Primitive::constructShapeMesh() {
         default: break;
     }
 
-    // After vertices are known, compute local-space bounding box
-    computeLocalBounds();
-}
-
-// -----------------------------------------------------------------------------
-// Update: computeLocalBounds now uses localVertices instead of a local vector
-// -----------------------------------------------------------------------------
-void Primitive::computeLocalBounds() {
-    if (localVertices.empty()) return;
-
-    glm::vec3 min(FLT_MAX), max(-FLT_MAX);
-    for (size_t i = 0; i < localVertices.size(); i += 8) { // assuming stride = 8
-        glm::vec3 pos(localVertices[i], localVertices[i+1], localVertices[i+2]);
-        min = glm::min(min, pos);
-        max = glm::max(max, pos);
-    }
-
-    boundingBox = {min, max};
-
-    // Debug print
-    std::cout << "[DEBUG] BoundingBox for " << GetTypeName()
-              << "  Min(" << min.x << "," << min.y << "," << min.z
-              << ")  Max(" << max.x << "," << max.y << "," << max.z << ")\n";
 }
 
 
@@ -565,4 +542,62 @@ void Primitive::draw() const {
     //glDrawElements(GL_TRIANGLE_STRIP, indexCount, GL_UNSIGNED_INT, 0);
     glBindVertexArray(0);
     glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+void Primitive::drawWireframe() const {
+    glBindVertexArray(VAO);
+    glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, nullptr);
+    glBindVertexArray(0);
+}
+
+namespace {
+glm::vec3 ClosestPointOnTriangle(const glm::vec3& point, const glm::vec3& a,
+                                 const glm::vec3& b, const glm::vec3& c) {
+    const glm::vec3 ab = b - a;
+    const glm::vec3 ac = c - a;
+    const glm::vec3 ap = point - a;
+    const float d1 = glm::dot(ab, ap);
+    const float d2 = glm::dot(ac, ap);
+    if (d1 <= 0.0f && d2 <= 0.0f) return a;
+
+    const glm::vec3 bp = point - b;
+    const float d3 = glm::dot(ab, bp);
+    const float d4 = glm::dot(ac, bp);
+    if (d3 >= 0.0f && d4 <= d3) return b;
+
+    const float vc = d1 * d4 - d3 * d2;
+    if (vc <= 0.0f && d1 >= 0.0f && d3 <= 0.0f)
+        return a + (d1 / (d1 - d3)) * ab;
+
+    const glm::vec3 cp = point - c;
+    const float d5 = glm::dot(ab, cp);
+    const float d6 = glm::dot(ac, cp);
+    if (d6 >= 0.0f && d5 <= d6) return c;
+
+    const float vb = d5 * d2 - d1 * d6;
+    if (vb <= 0.0f && d2 >= 0.0f && d6 <= 0.0f)
+        return a + (d2 / (d2 - d6)) * ac;
+
+    const float va = d3 * d6 - d5 * d4;
+    if (va <= 0.0f && (d4 - d3) >= 0.0f && (d5 - d6) >= 0.0f)
+        return b + ((d4 - d3) / ((d4 - d3) + (d5 - d6))) * (c - b);
+
+    const float denominator = 1.0f / (va + vb + vc);
+    return a + ab * (vb * denominator) + ac * (vc * denominator);
+}
+}
+
+bool Primitive::IntersectsSphere(const glm::vec3& center, float radius) const {
+    const float radiusSquared = radius * radius;
+    for (size_t i = 0; i + 2 < localIndices.size(); i += 3) {
+        glm::vec3 triangle[3];
+        for (int vertex = 0; vertex < 3; ++vertex) {
+            const size_t offset = static_cast<size_t>(localIndices[i + vertex]) * 8;
+            triangle[vertex] = glm::vec3(modelMatrix * glm::vec4(
+                localVertices[offset], localVertices[offset + 1], localVertices[offset + 2], 1.0f));
+        }
+        const glm::vec3 closest = ClosestPointOnTriangle(center, triangle[0], triangle[1], triangle[2]);
+        if (glm::dot(center - closest, center - closest) <= radiusSquared) return true;
+    }
+    return false;
 }
