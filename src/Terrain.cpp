@@ -5,8 +5,47 @@
 #include <iostream>
 #include <stb_image.h>
 #include <filesystem>
+#include <limits>
 #include "AssetPaths.h"
 namespace fs = std::filesystem;
+
+namespace {
+glm::vec3 ClosestPointOnTriangle(const glm::vec3& point, const glm::vec3& a,
+                                 const glm::vec3& b, const glm::vec3& c)
+{
+    const glm::vec3 ab = b - a;
+    const glm::vec3 ac = c - a;
+    const glm::vec3 ap = point - a;
+    const float d1 = glm::dot(ab, ap);
+    const float d2 = glm::dot(ac, ap);
+    if (d1 <= 0.0f && d2 <= 0.0f) return a;
+
+    const glm::vec3 bp = point - b;
+    const float d3 = glm::dot(ab, bp);
+    const float d4 = glm::dot(ac, bp);
+    if (d3 >= 0.0f && d4 <= d3) return b;
+
+    const float vc = d1 * d4 - d3 * d2;
+    if (vc <= 0.0f && d1 >= 0.0f && d3 <= 0.0f)
+        return a + ab * (d1 / (d1 - d3));
+
+    const glm::vec3 cp = point - c;
+    const float d5 = glm::dot(ab, cp);
+    const float d6 = glm::dot(ac, cp);
+    if (d6 >= 0.0f && d5 <= d6) return c;
+
+    const float vb = d5 * d2 - d1 * d6;
+    if (vb <= 0.0f && d2 >= 0.0f && d6 <= 0.0f)
+        return a + ac * (d2 / (d2 - d6));
+
+    const float va = d3 * d6 - d5 * d4;
+    if (va <= 0.0f && (d4 - d3) >= 0.0f && (d5 - d6) >= 0.0f)
+        return b + (c - b) * ((d4 - d3) / ((d4 - d3) + (d5 - d6)));
+
+    const float denominator = 1.0f / (va + vb + vc);
+    return a + ab * (vb * denominator) + ac * (vc * denominator);
+}
+}
 
 Terrain::Terrain(int width, int depth, float scale)
 {
@@ -21,6 +60,8 @@ void Terrain::GenerateMesh(int width, int depth, float scale)
 {
     std::vector<float> vertices;
     std::vector<unsigned int> indices;
+    collisionVertices.clear();
+    collisionIndices.clear();
 
     float halfW = width * 0.5f;
     float halfD = depth * 0.5f;
@@ -34,6 +75,7 @@ void Terrain::GenerateMesh(int width, int depth, float scale)
             vertices.push_back(xpos);
             vertices.push_back(0.0f); // flat plane
             vertices.push_back(zpos);
+            collisionVertices.emplace_back(xpos, 0.0f, zpos);
 
             // normals (up)
             vertices.push_back(0.0f);
@@ -62,6 +104,7 @@ void Terrain::GenerateMesh(int width, int depth, float scale)
     }
 
     indexCount = static_cast<int>(indices.size());
+    collisionIndices = indices;
 
     glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);
@@ -86,6 +129,46 @@ void Terrain::GenerateMesh(int width, int depth, float scale)
     glEnableVertexAttribArray(2);
 
     glBindVertexArray(0);
+}
+
+void Terrain::DrawWireframe() const
+{
+    glBindVertexArray(VAO);
+    glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, nullptr);
+    glBindVertexArray(0);
+}
+
+bool Terrain::IntersectsSphere(const glm::vec3& center, float radius,
+                               glm::vec3* contactNormal) const
+{
+    const float radiusSquared = radius * radius;
+    float closestDistanceSquared = std::numeric_limits<float>::max();
+    glm::vec3 bestNormal(0.0f, 1.0f, 0.0f);
+    bool intersects = false;
+
+    for (size_t i = 0; i + 2 < collisionIndices.size(); i += 3) {
+        const glm::vec3& a = collisionVertices[collisionIndices[i]];
+        const glm::vec3& b = collisionVertices[collisionIndices[i + 1]];
+        const glm::vec3& c = collisionVertices[collisionIndices[i + 2]];
+        const glm::vec3 closest = ClosestPointOnTriangle(center, a, b, c);
+        const glm::vec3 separation = center - closest;
+        const float distanceSquared = glm::dot(separation, separation);
+
+        if (distanceSquared <= radiusSquared && distanceSquared < closestDistanceSquared) {
+            intersects = true;
+            closestDistanceSquared = distanceSquared;
+            if (distanceSquared > 0.0000001f) {
+                bestNormal = separation / glm::sqrt(distanceSquared);
+            } else {
+                const glm::vec3 faceNormal = glm::cross(b - a, c - a);
+                if (glm::dot(faceNormal, faceNormal) > 0.0000001f)
+                    bestNormal = glm::normalize(faceNormal);
+            }
+        }
+    }
+
+    if (intersects && contactNormal) *contactNormal = bestNormal;
+    return intersects;
 }
 
 void Terrain::Draw(GLuint shaderProgram)
