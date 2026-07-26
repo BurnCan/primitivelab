@@ -5,6 +5,7 @@
 #include <iostream>
 #include <stb_image.h>
 #include <filesystem>
+#include "AssetPaths.h"
 namespace fs = std::filesystem;
 
 Terrain::Terrain(int width, int depth, float scale)
@@ -101,7 +102,7 @@ void Terrain::SetTexturePath(const std::string& path)
     if (textureID != 0)
         glDeleteTextures(1, &textureID);
 
-    fs::path texPath = fs::current_path().parent_path() / "textures" / path;
+    fs::path texPath = ResolveAssetPath(path, "textures");
     glGenTextures(1, &textureID);
     glBindTexture(GL_TEXTURE_2D, textureID);
 

@@ -90,6 +90,7 @@ add_executable(Game
 
 target_include_directories(Game PRIVATE ${COMMON_INCLUDE})
 target_link_libraries(Game PRIVATE glfw)
+target_compile_definitions(Game PRIVATE PRIMITIVELAB_ASSET_ROOT="${CMAKE_SOURCE_DIR}")
 
 # -------------------
 # Editor executable
@@ -104,6 +105,7 @@ add_executable(Editor
 
 target_include_directories(Editor PRIVATE ${COMMON_INCLUDE} ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends)
 target_link_libraries(Editor PRIVATE glfw)
+target_compile_definitions(Editor PRIVATE PRIMITIVELAB_ASSET_ROOT="${CMAKE_SOURCE_DIR}")
 
 # -------------------
 # Runtime assets
