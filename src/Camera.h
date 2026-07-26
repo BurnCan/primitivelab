@@ -18,6 +18,9 @@ const float ZOOM        = 45.0f;
 // plane. This prevents the near plane (including its corners) from passing
 // through a primitive while the camera's collision volume is still clear.
 const float FPS_CAMERA_COLLISION_RADIUS = 0.25f;
+const float FPS_CAMERA_CROUCH_RADIUS = 0.15f;
+const float FPS_GRAVITY = 9.81f;
+const float FPS_JUMP_SPEED = 2.75f;
 
 // =============================
 //        BASE CAMERA CLASS
@@ -72,6 +75,15 @@ public:
     float lastX = 0.0f;
     float lastY = 0.0f;
 
+    // Vertical motion belongs to the FPS camera rather than the free-flying
+    // editor camera. The collision radius also doubles as the camera's height
+    // above the floor, so reducing it produces a compact crouch.
+    float VerticalVelocity = 0.0f;
+    float CollisionRadius = FPS_CAMERA_COLLISION_RADIUS;
+    bool IsGrounded = false;
+    bool IsCrouching = false;
+    bool jumpWasPressed = false;
+
     FPSCamera(SceneManager* sceneManager,
               glm::vec3 position = glm::vec3(0.0f, 0.5f, 5.0f),
               glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f),
@@ -80,7 +92,7 @@ public:
               bool invertY = false);
 
     //void ProcessKeyboard(char direction, float deltaTime);
-    void ProcessInput(GLFWwindow* window, float deltaTime);
+    void ProcessInput(GLFWwindow* window, float deltaTime) override;
 
     // Static mouse callback for GLFW
     static void MouseCallback(GLFWwindow* window, double xpos, double ypos);

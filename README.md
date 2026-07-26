@@ -111,6 +111,13 @@ cmake --build build
 
 # Running
 
+## FPS controls
+
+- **W/A/S/D:** Move along the ground
+- **Mouse:** Look around
+- **Space:** Jump
+- **Left or right Ctrl:** Crouch
+
 ## Game
 
 From the project root:
