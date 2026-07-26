@@ -1,76 +1,140 @@
-Dependencies
-You will need:
+# Dependencies
 
-C++17 compatible compiler
-GCC 9+ / Clang 10+ recommended
-CMake 3.16+
-OpenGL 4.5
-GLFW
-GLAD
-GLM
-All third-party dependencies are fetched automatically via CMake where applicable.
+PrimitiveLab requires:
 
-OS Specific installation instructions for prerequisite tools:
-🪟 Windows (MSYS2 + MinGW64)
-1. Download and install the appropriate 64-bit version from the MSYS2 website. 
-2. Open MSYS2 UCRT 64-bit terminal
-Not MSYS, MinGW, or CLANG.
+- A C++17-compatible compiler (GCC 9+, Clang 10+, or MSVC 2022+ recommended)
+- CMake 3.16+
+- Git
 
-3. Update the package database and core system
+> **Note:** PrimitiveLab uses CMake's `FetchContent` module to automatically download and build third-party libraries during configuration. You **do not** need to manually install libraries such as GLFW, GLAD, or GLM.
+
+---
+
+# OS-Specific Setup
+
+## 🪟 Windows (MSYS2 UCRT64)
+
+1. Download and install the latest 64-bit version of MSYS2.
+2. Open the **MSYS2 UCRT64** terminal.
+3. Update MSYS2:
+
+```bash
 pacman -Syu
-# Restart terminal if prompted
+```
+
+If prompted, restart the terminal and run:
+
+```bash
 pacman -Su
-4. Install build tools
-pacman -S mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake mingw-w64-x86_64-make git
-📦 Optional: Install libraries manually Example:
+```
 
-pacman -S mingw-w64-x86_64-glfw mingw-w64-x86_64-glew mingw-w64-x86_64-glm mingw-w64-x86_64-imgui
-If the libraries you want to install are included in FetchContent in CMake, this is not required.
+4. Install the required development tools:
 
-🍏 macOS
-1. Install Homebrew using the install script from the Homebrew website
+```bash
+pacman -S \
+    mingw-w64-ucrt-x86_64-toolchain \
+    mingw-w64-ucrt-x86_64-cmake \
+    git
+```
+
+That's it! PrimitiveLab downloads all required third-party libraries automatically during the CMake configuration step.
+
+---
+
+## 🍏 macOS
+
+Install Homebrew:
+
+```bash
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-💡 Important: Follow the post-install instructions to add Homebrew to your shell config.
+```
 
-Post-installation steps When you install Homebrew, it prints some directions for updating your shell’s config. If you don’t follow those directions, Homebrew will not work.
+Follow the post-install instructions displayed by Homebrew to add it to your shell environment.
 
-You need to update your shell’s config file (which file exactly depends on your shell, for example ~/.bashrc or ~/.zshrc) to include this Example:
+Then install the required tools:
 
-echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
-eval "$(/opt/homebrew/bin/brew shellenv)"
-Replace with the directory where Homebrew is installed on your system. You can find Homebrew’s default install location in this FAQ entry.
-
-2. Install tools
+```bash
 brew install cmake git
-🐧 Ubuntu / Debian Linux
-1. Install tools
+```
+
+PrimitiveLab downloads all required third-party libraries automatically during the CMake configuration step.
+
+---
+
+## 🐧 Ubuntu / Debian
+
+Update your package list and install the required development tools:
+
+```bash
 sudo apt update
-sudo apt install build-essential cmake git libgl1-mesa-dev libx11-dev libxi-dev libxrandr-dev libxinerama-dev libxcursor-dev
 
+sudo apt install \
+    build-essential \
+    cmake \
+    git \
+    libgl1-mesa-dev \
+    libx11-dev \
+    libxi-dev \
+    libxrandr-dev \
+    libxinerama-dev \
+    libxcursor-dev
+```
 
-Build Instructions (Linux / macOS / Win)
+PrimitiveLab downloads all required third-party libraries automatically during the CMake configuration step.
 
-bash
+---
 
-git clone https://github.com/burncan/primitivelab
+# Building PrimitiveLab
+
+Clone the repository:
+
+```bash
+git clone https://github.com/burncan/primitivelab.git
 cd primitivelab
+```
 
-mkdir build && cd build
+Configure the project:
 
+```bash
+cmake -S . -B build
+```
 
-cmake ..
-cmake --build .
+During this step, CMake automatically downloads and builds any required third-party dependencies using `FetchContent`.
 
-Running the Game
-From the build directory:
+Build the project:
 
-bash
+```bash
+cmake --build build
+```
 
+---
+
+# Running
+
+## Game
+
+From the project root:
+
+```bash
+./build/Game
+```
+
+Or from inside the `build` directory:
+
+```bash
 ./Game
+```
 
-Running the Editor
-From the build directory:
+## Editor
 
-bash
+From the project root:
 
+```bash
+./build/Editor
+```
+
+Or from inside the `build` directory:
+
+```bash
 ./Editor
+```
