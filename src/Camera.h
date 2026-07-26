@@ -14,6 +14,11 @@ const float SPEED       = 1.0f;
 const float SENSITIVITY = 0.25f;
 const float ZOOM        = 45.0f;
 
+// Keep the FPS camera farther from rendered surfaces than the projection near
+// plane. This prevents the near plane (including its corners) from passing
+// through a primitive while the camera's collision volume is still clear.
+const float FPS_CAMERA_COLLISION_RADIUS = 0.25f;
+
 // =============================
 //        BASE CAMERA CLASS
 // =============================
