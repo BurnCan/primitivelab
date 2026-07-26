@@ -12,6 +12,7 @@
 #include "Camera.h"
 #include "SceneManager.h"
 #include "ShaderUtils.h"
+#include "AssetPaths.h"
 
 // ImGui
 #include "imgui.h"
@@ -29,7 +30,7 @@ float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
 // Shader directory
-const std::string SHADER_DIR = "../shaders/";
+const std::string SHADER_DIR = ResolveAssetPath("basic.vert", "shaders").parent_path().string() + "/";
 
 
 
@@ -120,7 +121,7 @@ int main() {
 SceneManager sceneManager;
 std::string currentSceneFile; // track currently loaded/saved scene path
 
-std::string defaultScenePath = "../scenes/default.txt";
+std::string defaultScenePath = ResolveAssetPath("default.txt", "scenes").string();
 if (sceneManager.loadScene(defaultScenePath)) {
     std::cout << "Loaded default scene: " << defaultScenePath << std::endl;
     currentSceneFile = defaultScenePath;

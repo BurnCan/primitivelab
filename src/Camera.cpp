@@ -1,5 +1,6 @@
 #include "Camera.h"
 #include "SceneManager.h"
+#include <algorithm>
 #include <iostream>
 
 // -----------------------------------------------------------------------------
@@ -109,7 +110,11 @@ glm::mat4 Camera::GetViewMatrix() const {
 
 // ✅ NEW: Projection Matrix
 glm::mat4 Camera::GetProjectionMatrix(int width, int height) const {
-    float aspectRatio = static_cast<float>(width) / static_cast<float>(height);
+    // A minimized window (or an empty editor viewport) can temporarily report
+    // zero dimensions. GLM requires a non-zero aspect ratio.
+    const int safeWidth = std::max(width, 1);
+    const int safeHeight = std::max(height, 1);
+    float aspectRatio = static_cast<float>(safeWidth) / static_cast<float>(safeHeight);
     return glm::perspective(glm::radians(Zoom), aspectRatio, 0.1f, 100.0f);
 }
 
