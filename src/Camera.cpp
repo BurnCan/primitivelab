@@ -197,12 +197,12 @@ void FPSCamera::ProcessInput(GLFWwindow* window, float deltaTime) {
     if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
         proposed.y -= velocity;
 
-    // Collision check using SceneManager with small camera radius
-const float cameraRadius = 0.1f;
-
-if (!scene || !scene->CheckCollision(proposed, cameraRadius)) {
-    Position = proposed;
-}
+    // The collision volume must enclose the camera's near clipping plane, not
+    // merely the view position, or surfaces can be clipped before the point at
+    // the center of the camera registers a collision.
+    if (!scene || !scene->CheckCollision(proposed, FPS_CAMERA_COLLISION_RADIUS)) {
+        Position = proposed;
+    }
 
 }
 
