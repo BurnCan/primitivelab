@@ -1,0 +1,7 @@
+Cube brick.jpg 0 0 0 1 1 1
+Sphere earth.jpg 3 0 0 1 1 1
+TriangularPrism metal.jpg -3 0 0 1 1 1
+Light 0 -1.25 -5 1 0 0
+Light -5 2 2 0 1 0
+Light 0.214 2 2 0 0 1
+Light 0 2.786 0 1 1 1

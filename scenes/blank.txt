@@ -1,0 +1,4 @@
+# Scene File
+# Format:
+# PrimitiveType TexturePath posX posY posZ rotX rotY rotZ scaleX scaleY scaleZ
+# Light posX posY posZ r g b

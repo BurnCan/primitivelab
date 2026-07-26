@@ -1,0 +1,10 @@
+# Scene file format:
+# PrimitiveType TexturePath posX posY posZ rotX rotY rotZ scaleX scaleY scaleZ
+# Light posX posY posZ colorR colorG colorB
+Cube brick.jpg 0 -0.232 -0.154 0 0 0 1 1 1
+Sphere earth.jpg 0.388 -10 0.155 0 0 0 5 5 5
+TriangularPrism metal.jpg 0 0.772 0 -87.907 -2.085 0 1 1 2.797
+Light 0 1.552 -5 1 0 0
+Light -5 1.595 2 0 1 0
+Light 5.011 1.595 2 0 0 1
+Light 0 5.194 0 1 1 1
