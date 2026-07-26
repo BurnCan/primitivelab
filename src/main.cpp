@@ -86,6 +86,8 @@ int main() {
     }
 
     glfwMakeContextCurrent(window);
+    // Enable VSync to prevent unnecessarily high FPS such as 2500
+    glfwSwapInterval(1); // Enable VSync 0=off 1=on
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
