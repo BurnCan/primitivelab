@@ -73,7 +73,10 @@ public:
     void drawWireframe() const;
 
     // Tests a world-space sphere against the actual triangles in this mesh.
-    bool IntersectsSphere(const glm::vec3& center, float radius) const;
+    // When supplied, contactNormal receives the direction from the closest
+    // surface point toward the sphere center.
+    bool IntersectsSphere(const glm::vec3& center, float radius,
+                          glm::vec3* contactNormal = nullptr) const;
 
     // New: update model matrix from transform components
     void UpdateModelMatrix() {

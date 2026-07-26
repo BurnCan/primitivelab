@@ -587,8 +587,11 @@ glm::vec3 ClosestPointOnTriangle(const glm::vec3& point, const glm::vec3& a,
 }
 }
 
-bool Primitive::IntersectsSphere(const glm::vec3& center, float radius) const {
+bool Primitive::IntersectsSphere(const glm::vec3& center, float radius,
+                                 glm::vec3* contactNormal) const {
     const float radiusSquared = radius * radius;
+    float closestDistanceSquared = radiusSquared;
+    bool intersects = false;
     for (size_t i = 0; i + 2 < localIndices.size(); i += 3) {
         glm::vec3 triangle[3];
         for (int vertex = 0; vertex < 3; ++vertex) {
@@ -597,7 +600,25 @@ bool Primitive::IntersectsSphere(const glm::vec3& center, float radius) const {
                 localVertices[offset], localVertices[offset + 1], localVertices[offset + 2], 1.0f));
         }
         const glm::vec3 closest = ClosestPointOnTriangle(center, triangle[0], triangle[1], triangle[2]);
-        if (glm::dot(center - closest, center - closest) <= radiusSquared) return true;
+        const glm::vec3 separation = center - closest;
+        const float distanceSquared = glm::dot(separation, separation);
+        if (distanceSquared <= radiusSquared && (!intersects || distanceSquared < closestDistanceSquared)) {
+            intersects = true;
+            closestDistanceSquared = distanceSquared;
+
+            if (contactNormal) {
+                if (distanceSquared > 0.0000001f) {
+                    *contactNormal = separation / glm::sqrt(distanceSquared);
+                } else {
+                    const glm::vec3 triangleNormal = glm::cross(
+                        triangle[1] - triangle[0], triangle[2] - triangle[0]);
+                    const float normalLengthSquared = glm::dot(triangleNormal, triangleNormal);
+                    *contactNormal = normalLengthSquared > 0.0000001f
+                        ? triangleNormal / glm::sqrt(normalLengthSquared)
+                        : glm::vec3(0.0f);
+                }
+            }
+        }
     }
-    return false;
+    return intersects;
 }

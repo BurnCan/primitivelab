@@ -172,10 +172,11 @@ void SceneManager::drawScene(const Shader& shader, Camera& camera, int width, in
 
 
 
-bool SceneManager::CheckCollision(const glm::vec3& point, float radius) {
+bool SceneManager::CheckCollision(const glm::vec3& point, float radius,
+                                  glm::vec3* contactNormal) {
     for (const auto& primitive : primitives) {
         primitive->UpdateModelMatrix();
-        if (primitive->IntersectsSphere(point, radius)) return true;
+        if (primitive->IntersectsSphere(point, radius, contactNormal)) return true;
     }
     return false;
 }

@@ -182,28 +182,48 @@ FPSCamera::FPSCamera(SceneManager* sceneManager,
 // --- Collision-aware keyboard ---
 void FPSCamera::ProcessInput(GLFWwindow* window, float deltaTime) {
     float velocity = MovementSpeed * deltaTime;
-    glm::vec3 proposed = Position;
+    glm::vec3 movement(0.0f);
 
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-        proposed += Front * velocity;
+        movement += Front * velocity;
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-        proposed -= Front * velocity;
+        movement -= Front * velocity;
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-        proposed -= Right * velocity;
+        movement -= Right * velocity;
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-        proposed += Right * velocity;
+        movement += Right * velocity;
     if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
-        proposed.y += velocity;
+        movement.y += velocity;
     if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
-        proposed.y -= velocity;
+        movement.y -= velocity;
 
     // The collision volume must enclose the camera's near clipping plane, not
     // merely the view position, or surfaces can be clipped before the point at
     // the center of the camera registers a collision.
-    if (!scene || !scene->CheckCollision(proposed, FPS_CAMERA_COLLISION_RADIUS)) {
-        Position = proposed;
+    if (!scene) {
+        Position += movement;
+        return;
     }
 
+    // Remove only the part of the requested movement that points into a
+    // collision surface. The remaining tangent component lets the camera
+    // glide along walls and slopes; a perpendicular impact naturally has no
+    // tangent component and therefore still comes to a stop.
+    glm::vec3 remaining = movement;
+    for (int iteration = 0; iteration < 3 && glm::dot(remaining, remaining) > 0.0000001f; ++iteration) {
+        const glm::vec3 proposed = Position + remaining;
+        glm::vec3 contactNormal(0.0f);
+        if (!scene->CheckCollision(proposed, FPS_CAMERA_COLLISION_RADIUS, &contactNormal)) {
+            Position = proposed;
+            break;
+        }
+
+        const float intoSurface = glm::dot(remaining, contactNormal);
+        if (intoSurface >= 0.0f || glm::dot(contactNormal, contactNormal) < 0.5f)
+            break;
+
+        remaining -= contactNormal * intoSurface;
+    }
 }
 
 // --- Static mouse callback for GLFW ---

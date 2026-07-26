@@ -29,7 +29,8 @@ public:
 
 
     // --- Collision ---
-    bool CheckCollision(const glm::vec3& point, float radius = FPS_CAMERA_COLLISION_RADIUS);
+    bool CheckCollision(const glm::vec3& point, float radius = FPS_CAMERA_COLLISION_RADIUS,
+                        glm::vec3* contactNormal = nullptr);
 
 
     void DrawDebugWindow();
