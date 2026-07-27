@@ -63,10 +63,11 @@ int main() {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    // Do not let a partially initialized window take focus and then lose it to
-    // the process that launched the game.  Showing the ready window below gives
-    // GLFW a real activation event instead of relying on a later focus request.
-    glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+    // A fullscreen window must be created visible.  Creating a hidden window,
+    // loading the scene, and converting it to fullscreen later leaves some
+    // window managers without a valid user-activation token; pointer capture
+    // can still work in that state while keyboard events remain with the
+    // launcher until the player clicks the window.
     glfwWindowHint(GLFW_FOCUSED, GLFW_TRUE);
     glfwWindowHint(GLFW_FOCUS_ON_SHOW, GLFW_TRUE);
 
@@ -78,10 +79,7 @@ int main() {
     if (monitor && mode) {
         SCR_WIDTH = mode->width;
         SCR_HEIGHT = mode->height;
-        // Create a hidden windowed context while assets load.  Switching it to
-        // fullscreen only when initialization is complete makes the final show
-        // operation responsible for activating the game window.
-        window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Game", nullptr, nullptr);
+        window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Game", monitor, nullptr);
         std::cout << "Fullscreen: " << SCR_WIDTH << "x" << SCR_HEIGHT << "\n";
     } else {
         std::cerr << "Falling back to windowed mode.\n";
@@ -123,6 +121,9 @@ int main() {
 
     useFPSCamera = true;
     glfwSetWindowUserPointer(window, &fpsCamera);
+    glfwSetCursorPosCallback(window, MouseCallback);
+    glfwSetScrollCallback(window, ScrollCallback);
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
     // ---------------- Scene Load ----------------
     if (!scene.loadScene(ResolveAssetPath("default.txt", "scenes").string())) {
@@ -137,18 +138,10 @@ int main() {
         scene.AddLight(light);
     }
 
-    // Present and activate the window only after all blocking startup work is
-    // finished.  Capturing the cursor after the window is shown also ensures
-    // keyboard and mouse input are enabled by the same activation event.
-    if (monitor && mode) {
-        glfwSetWindowMonitor(window, monitor, 0, 0, mode->width, mode->height,
-                             mode->refreshRate);
-    }
-    glfwShowWindow(window);
+    // Reassert focus after blocking asset loading.  The initial visible
+    // fullscreen creation supplies the activation event; this request handles
+    // launchers that briefly reclaim focus while startup work is in progress.
     glfwFocusWindow(window);
-    glfwSetCursorPosCallback(window, MouseCallback);
-    glfwSetScrollCallback(window, ScrollCallback);
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     glfwPollEvents();
 
     // ---------------- Main Loop ----------------
