@@ -1,4 +1,5 @@
 #pragma once
+#include <cstddef>
 #include <vector>
 #include <string>
 #include <memory>
@@ -42,6 +43,7 @@ public:
     // Scene management
     const std::vector<std::unique_ptr<Primitive>>& GetPrimitives() const { return primitives; }
     void AddPrimitive(std::unique_ptr<Primitive> prim) { primitives.push_back(std::move(prim)); }
+    bool RemovePrimitive(std::size_t index);
 
      // Terrain access
     Terrain& GetTerrain() { return terrain; }

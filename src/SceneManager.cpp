@@ -18,6 +18,13 @@ SceneManager::SceneManager()
 
 }
 
+bool SceneManager::RemovePrimitive(std::size_t index) {
+    if (index >= primitives.size()) return false;
+
+    primitives.erase(primitives.begin() + static_cast<std::ptrdiff_t>(index));
+    return true;
+}
+
 // Persistent light sphere
 //SceneManager::SceneManager()
     //: lightSphere(PrimitiveType::Sphere, "sun.jpg", 16, 16) {}
