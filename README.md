@@ -93,6 +93,13 @@ git clone https://github.com/burncan/primitivelab.git
 cd primitivelab
 ```
 
+Alternatively:
+
+💡 To clone a specific branch (e.g., development):
+```bash
+git clone --branch development --single-branch https://github.com/BurnCan/primitivelab
+```
+
 Configure the project:
 
 ```bash
