@@ -533,12 +533,6 @@ for (int i = 0; i < static_cast<int>(primitives.size()); ++i) {
     if (!prim) continue;
 
     ImGui::PushID(i);
-    if (ImGui::Button("Delete")) {
-        primitiveToDelete = i;
-        ImGui::PopID();
-        continue;
-    }
-    ImGui::SameLine();
     if (ImGui::CollapsingHeader(
             (prim->GetTypeName() + "##" + std::to_string(i)).c_str(),
             ImGuiTreeNodeFlags_DefaultOpen))
@@ -581,6 +575,10 @@ for (int i = 0; i < static_cast<int>(primitives.size()); ++i) {
 
         // Texture thumbnail
         ImGui::Image((void*)(intptr_t)prim->GetTextureID(), ImVec2(64, 64), ImVec2(0,1), ImVec2(1,0));
+
+        if (ImGui::Button("Delete")) {
+            primitiveToDelete = i;
+        }
 
         ImGui::Columns(1); // End columns
 
