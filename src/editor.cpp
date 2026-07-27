@@ -527,10 +527,18 @@ if (!hasTextures) ImGui::EndDisabled();
 ImGui::Separator();
 
 auto& primitives = sceneManager.GetPrimitives();
+int primitiveToDelete = -1;
 for (int i = 0; i < static_cast<int>(primitives.size()); ++i) {
     Primitive* prim = primitives[i].get();
     if (!prim) continue;
 
+    ImGui::PushID(i);
+    if (ImGui::Button("Delete")) {
+        primitiveToDelete = i;
+        ImGui::PopID();
+        continue;
+    }
+    ImGui::SameLine();
     if (ImGui::CollapsingHeader(
             (prim->GetTypeName() + "##" + std::to_string(i)).c_str(),
             ImGuiTreeNodeFlags_DefaultOpen))
@@ -578,6 +586,13 @@ for (int i = 0; i < static_cast<int>(primitives.size()); ++i) {
 
         ImGui::Separator();
     }
+    ImGui::PopID();
+}
+
+// Defer removal until iteration is complete so erasing the unique_ptr cannot
+// invalidate the primitive list while its controls are being drawn.
+if (primitiveToDelete >= 0) {
+    sceneManager.RemovePrimitive(static_cast<std::size_t>(primitiveToDelete));
 }
 
 ImGui::End();
