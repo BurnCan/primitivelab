@@ -477,8 +477,57 @@ ImGui::Begin("Primitives");
 const std::filesystem::path textureDirectory = ResolveAssetPath("textures", "textures");
 std::vector<std::string> textureFiles = GetAvailableTextures(textureDirectory.string());
 
+// Controls for creating a primitive in the current scene.
+static int newPrimitiveTypeIndex = 0;
+static int newPrimitiveTextureIndex = 0;
+static const char* primitiveTypeNames[] = {
+    "Cube", "Triangular Prism", "Sphere", "Triangle", "Plane", "Slab"
+};
+static const PrimitiveType primitiveTypes[] = {
+    PrimitiveType::Cube,
+    PrimitiveType::TriangularPrism,
+    PrimitiveType::Sphere,
+    PrimitiveType::Triangle,
+    PrimitiveType::Plane,
+    PrimitiveType::Slab
+};
+
+ImGui::Text("Add Primitive");
+ImGui::SetNextItemWidth(200.0f);
+ImGui::Combo("Type##NewPrimitive", &newPrimitiveTypeIndex, primitiveTypeNames,
+             IM_ARRAYSIZE(primitiveTypeNames));
+
+const bool hasTextures = !textureFiles.empty();
+if (hasTextures && newPrimitiveTextureIndex >= static_cast<int>(textureFiles.size())) {
+    newPrimitiveTextureIndex = 0;
+}
+
+ImGui::SetNextItemWidth(200.0f);
+const char* texturePreview = hasTextures
+    ? textureFiles[newPrimitiveTextureIndex].c_str()
+    : "No textures found";
+if (ImGui::BeginCombo("Texture##NewPrimitive", texturePreview)) {
+    for (int i = 0; i < static_cast<int>(textureFiles.size()); ++i) {
+        const bool selected = (newPrimitiveTextureIndex == i);
+        if (ImGui::Selectable(textureFiles[i].c_str(), selected)) {
+            newPrimitiveTextureIndex = i;
+        }
+        if (selected) ImGui::SetItemDefaultFocus();
+    }
+    ImGui::EndCombo();
+}
+
+if (!hasTextures) ImGui::BeginDisabled();
+if (ImGui::Button("Add Primitive") && hasTextures) {
+    auto primitive = std::make_unique<Primitive>(
+        primitiveTypes[newPrimitiveTypeIndex], textureFiles[newPrimitiveTextureIndex]);
+    sceneManager.AddPrimitive(std::move(primitive));
+}
+if (!hasTextures) ImGui::EndDisabled();
+ImGui::Separator();
+
 auto& primitives = sceneManager.GetPrimitives();
-for (int i = 0; i < primitives.size(); ++i) {
+for (int i = 0; i < static_cast<int>(primitives.size()); ++i) {
     Primitive* prim = primitives[i].get();
     if (!prim) continue;
 

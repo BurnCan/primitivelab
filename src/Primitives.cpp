@@ -2,6 +2,7 @@
 #include <stb_image.h>
 #include <iostream>
 #include <cmath>
+#include <algorithm>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -26,6 +27,7 @@ std::vector<std::string> GetAvailableTextures(const std::string& dir) {
         std::cerr << "Error scanning texture directory " << dir << ": " << e.what() << std::endl;
     }
 
+    std::sort(textures.begin(), textures.end());
     return textures;
 }
 
