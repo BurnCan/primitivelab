@@ -90,7 +90,10 @@ add_executable(Game
 
 target_include_directories(Game PRIVATE ${COMMON_INCLUDE})
 target_link_libraries(Game PRIVATE glfw)
-target_compile_definitions(Game PRIVATE PRIMITIVELAB_ASSET_ROOT="${CMAKE_SOURCE_DIR}")
+target_compile_definitions(Game PRIVATE
+    PRIMITIVELAB_ASSET_ROOT="${CMAKE_SOURCE_DIR}"
+    PRIMITIVELAB_BACKGROUND_KEYBOARD_INPUT
+)
 
 # -------------------
 # Editor executable

@@ -13,6 +13,7 @@
 #include "SceneManager.h"
 #include "ShaderUtils.h"
 #include "AssetPaths.h"
+#include "KeyboardInput.h"
 
 // ImGui
 #include "imgui.h"
@@ -212,7 +213,7 @@ glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         glfwPollEvents();
 
         // Switch windows
-        bool f1Pressed = glfwGetKey(window, GLFW_KEY_F1) == GLFW_PRESS;
+        bool f1Pressed = IsKeyPressed(window, GLFW_KEY_F1);
         if (f1Pressed && !f1PressedLast) focusedWindowIndex = (focusedWindowIndex + 1) % numWindows;
         f1PressedLast = f1Pressed;
 

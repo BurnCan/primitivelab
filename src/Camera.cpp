@@ -1,5 +1,6 @@
 #include "Camera.h"
 #include "SceneManager.h"
+#include "KeyboardInput.h"
 #include <algorithm>
 #include <iostream>
 
@@ -137,17 +138,17 @@ void Camera::ProcessMouseMovement(float xoffset, float yoffset, bool constrainPi
 void Camera::ProcessInput(GLFWwindow* window, float deltaTime) {
     float velocity = MovementSpeed * deltaTime;
 
-    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+    if (IsKeyPressed(window, GLFW_KEY_W))
         Position += Front * velocity;
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+    if (IsKeyPressed(window, GLFW_KEY_S))
         Position -= Front * velocity;
-    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+    if (IsKeyPressed(window, GLFW_KEY_A))
         Position -= Right * velocity;
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+    if (IsKeyPressed(window, GLFW_KEY_D))
         Position += Right * velocity;
-    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
+    if (IsKeyPressed(window, GLFW_KEY_SPACE))
         Position.y += velocity;
-    if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
+    if (IsKeyPressed(window, GLFW_KEY_LEFT_CONTROL))
         Position.y -= velocity;
 }
 
@@ -199,21 +200,21 @@ void FPSCamera::ProcessInput(GLFWwindow* window, float deltaTime) {
     if (glm::dot(right, right) > 0.0001f)
         right = glm::normalize(right);
 
-    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+    if (IsKeyPressed(window, GLFW_KEY_W))
         movement += forward;
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+    if (IsKeyPressed(window, GLFW_KEY_S))
         movement -= forward;
-    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+    if (IsKeyPressed(window, GLFW_KEY_A))
         movement -= right;
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+    if (IsKeyPressed(window, GLFW_KEY_D))
         movement += right;
     if (glm::dot(movement, movement) > 1.0f)
         movement = glm::normalize(movement);
     movement *= velocity;
 
     const bool crouchPressed =
-        glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS ||
-        glfwGetKey(window, GLFW_KEY_RIGHT_CONTROL) == GLFW_PRESS;
+        IsKeyPressed(window, GLFW_KEY_LEFT_CONTROL) ||
+        IsKeyPressed(window, GLFW_KEY_RIGHT_CONTROL);
 
     // Keep the bottom of the collision volume fixed while changing height.
     // Standing is refused when there is not enough headroom.
@@ -239,7 +240,7 @@ void FPSCamera::ProcessInput(GLFWwindow* window, float deltaTime) {
         Position - glm::vec3(0.0f, groundProbeDistance, 0.0f),
         CollisionRadius, &groundNormal) && groundNormal.y > 0.5f;
 
-    const bool jumpPressed = glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS;
+    const bool jumpPressed = IsKeyPressed(window, GLFW_KEY_SPACE);
     if (jumpPressed && !jumpWasPressed && IsGrounded) {
         VerticalVelocity = FPS_JUMP_SPEED;
         IsGrounded = false;

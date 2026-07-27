@@ -12,6 +12,7 @@
 #include "SceneManager.h"
 #include "ShaderUtils.h"
 #include "AssetPaths.h"
+#include "KeyboardInput.h"
 
 namespace fs = std::filesystem;
 
@@ -154,7 +155,7 @@ int main() {
         glfwPollEvents();
 
         // ---------------- Camera Toggle ----------------
-        bool tabDown = glfwGetKey(window, GLFW_KEY_TAB) == GLFW_PRESS;
+        bool tabDown = IsKeyPressed(window, GLFW_KEY_TAB);
         if (tabDown && !tabWasDown) {
             useFPSCamera = !useFPSCamera;
 
