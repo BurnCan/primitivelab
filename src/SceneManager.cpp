@@ -8,6 +8,14 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <algorithm>
 
+namespace {
+detail::PrimitiveMesh* MeshFor(SceneObject* object) {
+    return dynamic_cast<detail::PrimitiveMesh*>(object);
+}
+const detail::PrimitiveMesh* MeshFor(const SceneObject* object) {
+    return dynamic_cast<const detail::PrimitiveMesh*>(object);
+}
+}
 
 //Terrain
 SceneManager::SceneManager()
@@ -18,16 +26,16 @@ SceneManager::SceneManager()
 
 }
 
-bool SceneManager::RemovePrimitive(std::size_t index) {
-    if (index >= primitives.size()) return false;
+bool SceneManager::RemoveSceneObject(std::size_t index) {
+    if (index >= sceneObjects.size()) return false;
 
-    primitives.erase(primitives.begin() + static_cast<std::ptrdiff_t>(index));
+    sceneObjects.erase(sceneObjects.begin() + static_cast<std::ptrdiff_t>(index));
     return true;
 }
 
 // Persistent light sphere
 //SceneManager::SceneManager()
-    //: lightSphere(PrimitiveType::Sphere, "sun.jpg", 16, 16) {}
+    //: lightSphere(detail::PrimitiveMeshType::Sphere, "sun.jpg", 16, 16) {}
 
 bool SceneManager::loadScene(const std::string& path) {
     std::ifstream file(path);
@@ -36,7 +44,7 @@ bool SceneManager::loadScene(const std::string& path) {
         return false;
     }
 
-    primitives.clear();
+    sceneObjects.clear();
     lights.clear();
 
     std::string line;
@@ -53,21 +61,20 @@ bool SceneManager::loadScene(const std::string& path) {
         if (primTypeStr == "Cube" || primTypeStr == "TriangularPrism" || primTypeStr == "Sphere" || primTypeStr == "Plane" || primTypeStr == "Slab" || primTypeStr == "Triangle") {
             if (!(iss >> texturePath >> px >> py >> pz >> rx >> ry >> rz >> sx >> sy >> sz)) continue;
 
-            PrimitiveType type;
-            if (primTypeStr == "Cube") type = PrimitiveType::Cube;
-            else if (primTypeStr == "TriangularPrism") type = PrimitiveType::TriangularPrism;
-            else if (primTypeStr == "Sphere") type = PrimitiveType::Sphere;
-            else if (primTypeStr == "Plane") type = PrimitiveType::Plane;
-            else if (primTypeStr == "Slab") type = PrimitiveType::Slab;
-            else type = PrimitiveType::Triangle;
-
-            auto prim = std::make_unique<Primitive>(type, texturePath);
+            std::unique_ptr<::SceneObject> object;
+            if (primTypeStr == "Triangle") object = std::make_unique<TwoD::Primitive>(TwoD::PrimitiveType::Triangle, texturePath);
+            else if (primTypeStr == "Plane") object = std::make_unique<TwoD::Primitive>(TwoD::PrimitiveType::Plane, texturePath);
+            else if (primTypeStr == "TriangularPrism") object = std::make_unique<ThreeD::Primitive>(ThreeD::PrimitiveType::TriangularPrism, texturePath);
+            else if (primTypeStr == "Sphere") object = std::make_unique<ThreeD::Primitive>(ThreeD::PrimitiveType::Sphere, texturePath);
+            else if (primTypeStr == "Slab") object = std::make_unique<ThreeD::Primitive>(ThreeD::PrimitiveType::Slab, texturePath);
+            else object = std::make_unique<ThreeD::Primitive>(ThreeD::PrimitiveType::Cube, texturePath);
+            auto* prim = MeshFor(object.get());
             prim->position = glm::vec3(px, py, pz);
             prim->rotation = glm::vec3(rx, ry, rz);
             prim->scale    = glm::vec3(sx, sy, sz);
             prim->UpdateModelMatrix();
 
-            primitives.push_back(std::move(prim));
+            AddSceneObject(std::move(object));
         }
         else if (primTypeStr == "Light") {
             Light light;
@@ -94,8 +101,10 @@ bool SceneManager::saveScene(const std::string& path) {
     file << "# PrimitiveType TexturePath posX posY posZ rotX rotY rotZ scaleX scaleY scaleZ\n";
     file << "# Light posX posY posZ colorR colorG colorB\n";
 
-    // Save primitives
-    for (const auto& prim : primitives) {
+    // Save sceneObjects
+    for (const auto& object : sceneObjects) {
+        const auto* prim = MeshFor(object.get());
+        if (!prim) continue; // Future model objects can define their own serialization.
         std::string typeName = prim->GetTypeName();
 
         //remove any spaces from typename to avoid conflict with scene file format
@@ -151,8 +160,10 @@ void SceneManager::drawScene(const Shader& shader, Camera& camera, int width, in
         shader.SetFloat(base + ".shininess", 32.0f);
     }
 
-    // --- Draw primitives ---
-    for (auto& prim : primitives) {
+    // --- Draw sceneObjects ---
+    for (auto& object : sceneObjects) {
+        auto* prim = MeshFor(object.get());
+        if (!prim) continue;
         shader.SetInt("texture1", 0);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, prim->GetTextureID());
@@ -183,7 +194,9 @@ bool SceneManager::CheckCollision(const glm::vec3& point, float radius,
                                   glm::vec3* contactNormal) {
     if (terrain.IntersectsSphere(point, radius, contactNormal)) return true;
 
-    for (const auto& primitive : primitives) {
+    for (const auto& object : sceneObjects) {
+        auto* primitive = MeshFor(object.get());
+        if (!primitive) continue;
         primitive->UpdateModelMatrix();
         if (primitive->IntersectsSphere(point, radius, contactNormal)) return true;
     }
@@ -254,10 +267,12 @@ void SceneManager::DrawCollisionMeshes(const Shader& shader, const Camera& camer
     // glEnable(GL_LINE_SMOOTH);
 
     if (drawPrimitiveMeshes) {
-        for (const auto& primPtr : primitives)
+        for (const auto& object : sceneObjects)
         {
-            const Primitive& prim = *primPtr;
-            const_cast<Primitive&>(prim).UpdateModelMatrix();
+            const auto* mesh = MeshFor(object.get());
+            if (!mesh) continue;
+            const detail::PrimitiveMesh& prim = *mesh;
+            const_cast<detail::PrimitiveMesh&>(prim).UpdateModelMatrix();
             mutableShader.SetMat4("model", prim.modelMatrix);
             prim.drawWireframe();
         }

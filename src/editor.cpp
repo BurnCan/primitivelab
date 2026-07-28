@@ -132,13 +132,13 @@ if (sceneManager.loadScene(defaultScenePath)) {
 } else {
     std::cout << "No scene found, creating default one...\n";
 
-    auto cube   = std::make_unique<Primitive>(PrimitiveType::Cube, "textures/brick.jpg");
-    auto prism  = std::make_unique<Primitive>(PrimitiveType::TriangularPrism, "textures/wood.jpg");
-    auto sphere = std::make_unique<Primitive>(PrimitiveType::Sphere, "textures/earth.jpg", 16, 16);
+    auto cube   = std::make_unique<ThreeD::Primitive>(ThreeD::PrimitiveType::Cube, "textures/brick.jpg");
+    auto prism  = std::make_unique<ThreeD::Primitive>(ThreeD::PrimitiveType::TriangularPrism, "textures/wood.jpg");
+    auto sphere = std::make_unique<ThreeD::Primitive>(ThreeD::PrimitiveType::Sphere, "textures/earth.jpg", 16, 16);
 
-    sceneManager.AddPrimitive(std::move(cube));
-    sceneManager.AddPrimitive(std::move(prism));
-    sceneManager.AddPrimitive(std::move(sphere));
+    sceneManager.AddSceneObject(std::move(cube));
+    sceneManager.AddSceneObject(std::move(prism));
+    sceneManager.AddSceneObject(std::move(sphere));
 
     Light light;
     light.position = glm::vec3(-2.0f,1.0f,-2.0f);
@@ -402,7 +402,7 @@ if (sceneFocused) {
         glClearColor(0.1f,0.1f,0.1f,1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // Draw all primitives via SceneManager
+        // Draw all scene objects via SceneManager.
         sceneManager.drawScene(shader,
                        useFPSCamera ? fpsCamera : editorCamera,
                        SCR_WIDTH,
@@ -469,130 +469,74 @@ if (sceneFocused) {
 
         ImGui::End();
 
-// === Primitive Editor Window ===
-ImGui::Begin("Primitives");
+// === Scene Object Editor Window ===
+ImGui::Begin("Scene Objects");
 
-// Refresh textures each frame. Resolve the relative asset directory instead of
-// assuming that the editor was launched from its executable directory.
 const std::filesystem::path textureDirectory = ResolveAssetPath("textures", "textures");
 std::vector<std::string> textureFiles = GetAvailableTextures(textureDirectory.string());
-
-// Controls for creating a primitive in the current scene.
-static int newPrimitiveTypeIndex = 0;
 static int newPrimitiveTextureIndex = 0;
-static const char* primitiveTypeNames[] = {
-    "Cube", "Triangular Prism", "Sphere", "Triangle", "Plane", "Slab"
-};
-static const PrimitiveType primitiveTypes[] = {
-    PrimitiveType::Cube,
-    PrimitiveType::TriangularPrism,
-    PrimitiveType::Sphere,
-    PrimitiveType::Triangle,
-    PrimitiveType::Plane,
-    PrimitiveType::Slab
-};
-
-ImGui::Text("Add Primitive");
-ImGui::SetNextItemWidth(200.0f);
-ImGui::Combo("Type##NewPrimitive", &newPrimitiveTypeIndex, primitiveTypeNames,
-             IM_ARRAYSIZE(primitiveTypeNames));
-
 const bool hasTextures = !textureFiles.empty();
-if (hasTextures && newPrimitiveTextureIndex >= static_cast<int>(textureFiles.size())) {
-    newPrimitiveTextureIndex = 0;
-}
-
-ImGui::SetNextItemWidth(200.0f);
-const char* texturePreview = hasTextures
-    ? textureFiles[newPrimitiveTextureIndex].c_str()
-    : "No textures found";
-if (ImGui::BeginCombo("Texture##NewPrimitive", texturePreview)) {
+if (hasTextures && newPrimitiveTextureIndex >= static_cast<int>(textureFiles.size())) newPrimitiveTextureIndex = 0;
+const char* texturePreview = hasTextures ? textureFiles[newPrimitiveTextureIndex].c_str() : "No textures found";
+if (ImGui::BeginCombo("Texture##NewSceneObject", texturePreview)) {
     for (int i = 0; i < static_cast<int>(textureFiles.size()); ++i) {
-        const bool selected = (newPrimitiveTextureIndex == i);
-        if (ImGui::Selectable(textureFiles[i].c_str(), selected)) {
-            newPrimitiveTextureIndex = i;
-        }
+        const bool selected = newPrimitiveTextureIndex == i;
+        if (ImGui::Selectable(textureFiles[i].c_str(), selected)) newPrimitiveTextureIndex = i;
         if (selected) ImGui::SetItemDefaultFocus();
     }
     ImGui::EndCombo();
 }
-
+const std::string creationTexture = hasTextures ? textureFiles[newPrimitiveTextureIndex] : std::string{};
 if (!hasTextures) ImGui::BeginDisabled();
-if (ImGui::Button("Add Primitive") && hasTextures) {
-    auto primitive = std::make_unique<Primitive>(
-        primitiveTypes[newPrimitiveTypeIndex], textureFiles[newPrimitiveTextureIndex]);
-    sceneManager.AddPrimitive(std::move(primitive));
-}
+ImGui::Text("Add 2D Primitive");
+if (ImGui::Button("Triangle")) sceneManager.AddSceneObject(std::make_unique<TwoD::Primitive>(TwoD::PrimitiveType::Triangle, creationTexture));
+ImGui::SameLine();
+if (ImGui::Button("Plane")) sceneManager.AddSceneObject(std::make_unique<TwoD::Primitive>(TwoD::PrimitiveType::Plane, creationTexture));
+ImGui::Text("Add 3D Primitive");
+if (ImGui::Button("Cube")) sceneManager.AddSceneObject(std::make_unique<ThreeD::Primitive>(ThreeD::PrimitiveType::Cube, creationTexture));
+ImGui::SameLine();
+if (ImGui::Button("Triangular Prism")) sceneManager.AddSceneObject(std::make_unique<ThreeD::Primitive>(ThreeD::PrimitiveType::TriangularPrism, creationTexture));
+ImGui::SameLine();
+if (ImGui::Button("Sphere")) sceneManager.AddSceneObject(std::make_unique<ThreeD::Primitive>(ThreeD::PrimitiveType::Sphere, creationTexture));
+ImGui::SameLine();
+if (ImGui::Button("Slab")) sceneManager.AddSceneObject(std::make_unique<ThreeD::Primitive>(ThreeD::PrimitiveType::Slab, creationTexture));
 if (!hasTextures) ImGui::EndDisabled();
 ImGui::Separator();
 
-auto& primitives = sceneManager.GetPrimitives();
-int primitiveToDelete = -1;
-for (int i = 0; i < static_cast<int>(primitives.size()); ++i) {
-    Primitive* prim = primitives[i].get();
-    if (!prim) continue;
-
+const auto& sceneObjects = sceneManager.GetSceneObjects();
+int objectToDelete = -1;
+for (int i = 0; i < static_cast<int>(sceneObjects.size()); ++i) {
+    SceneObject* object = sceneObjects[i].get();
+    auto* prim = dynamic_cast<detail::PrimitiveMesh*>(object);
+    if (!object || !prim) continue;
+    const char* category = object->GetDimension() == SceneDimension::TwoD ? "2D Primitive" : "3D Primitive";
     ImGui::PushID(i);
-    if (ImGui::CollapsingHeader(
-            (prim->GetTypeName() + "##" + std::to_string(i)).c_str(),
-            ImGuiTreeNodeFlags_DefaultOpen))
-    {
-        // ---------------- Begin 2 Columns ----------------
-        ImGui::Columns(2, ("PrimitiveColumns##" + std::to_string(i)).c_str(), false);
-
-        // ---------------- Left Column: Transform ----------------
-        ImGui::Text("Transform");
-        if (ImGui::SliderFloat3(("Position##" + std::to_string(i)).c_str(),
-                                &prim->position[0], -10.0f, 10.0f))
-            prim->UpdateModelMatrix();
-        if (ImGui::SliderFloat3(("Rotation##" + std::to_string(i)).c_str(),
-                                &prim->rotation[0], -180.0f, 180.0f))
-            prim->UpdateModelMatrix();
-        if (ImGui::SliderFloat3(("Scale##" + std::to_string(i)).c_str(),
-                                &prim->scale[0], 0.1f, 5.0f))
-            prim->UpdateModelMatrix();
-
-        ImGui::NextColumn(); // Move to right column
-
-        // ---------------- Right Column: Texture ----------------
+    const std::string heading = object->GetName() + " — " + category + "##" + std::to_string(i);
+    if (ImGui::CollapsingHeader(heading.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::Columns(2, ("SceneObjectColumns##" + std::to_string(i)).c_str(), false);
+        ImGui::Text("Transform (3D world placement)");
+        if (ImGui::SliderFloat3("Position", &prim->position[0], -10.0f, 10.0f)) prim->UpdateModelMatrix();
+        if (ImGui::SliderFloat3("Rotation", &prim->rotation[0], -180.0f, 180.0f)) prim->UpdateModelMatrix();
+        if (ImGui::SliderFloat3("Scale", &prim->scale[0], 0.1f, 5.0f)) prim->UpdateModelMatrix();
+        ImGui::NextColumn();
         ImGui::Text("Texture");
-        std::string comboLabel = "Select Texture##" + std::to_string(i);
-        std::string currentTex = prim->GetTexturePath().empty() ? "(none)" : prim->GetTexturePath();
-
-        if (ImGui::BeginCombo(comboLabel.c_str(), currentTex.c_str())) {
-            for (auto& tex : textureFiles) {
-                bool selected = (tex == prim->GetTexturePath());
-                if (ImGui::Selectable(tex.c_str(), selected)) {
-                    prim->SetTexturePath((std::filesystem::path("textures") / tex).generic_string());
-                }
+        const std::string currentTex = prim->GetTexturePath().empty() ? "(none)" : prim->GetTexturePath();
+        if (ImGui::BeginCombo("Select Texture", currentTex.c_str())) {
+            for (const auto& tex : textureFiles) {
+                const bool selected = tex == prim->GetTexturePath();
+                if (ImGui::Selectable(tex.c_str(), selected)) prim->SetTexturePath((std::filesystem::path("textures") / tex).generic_string());
                 if (selected) ImGui::SetItemDefaultFocus();
             }
             ImGui::EndCombo();
         }
-
-        // Small vertical spacing
-        ImGui::Dummy(ImVec2(0.0f, 5.0f));
-
-        // Texture thumbnail
         ImGui::Image((void*)(intptr_t)prim->GetTextureID(), ImVec2(64, 64), ImVec2(0,1), ImVec2(1,0));
-
-        if (ImGui::Button("Delete")) {
-            primitiveToDelete = i;
-        }
-
-        ImGui::Columns(1); // End columns
-
+        if (ImGui::Button("Delete")) objectToDelete = i;
+        ImGui::Columns(1);
         ImGui::Separator();
     }
     ImGui::PopID();
 }
-
-// Defer removal until iteration is complete so erasing the unique_ptr cannot
-// invalidate the primitive list while its controls are being drawn.
-if (primitiveToDelete >= 0) {
-    sceneManager.RemovePrimitive(static_cast<std::size_t>(primitiveToDelete));
-}
-
+if (objectToDelete >= 0) sceneManager.RemoveSceneObject(static_cast<std::size_t>(objectToDelete));
 ImGui::End();
 
 
