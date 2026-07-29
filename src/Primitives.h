@@ -8,7 +8,7 @@
 
 
 // ---- How to Add a New Primitive ----
-// 1. Add a value to the appropriate TwoD/ThreeD PrimitiveType enum and to
+// 1. Add a value to the appropriate Primitive2DType/Primitive3DType enum and to
 //    the internal PrimitiveMeshType used by mesh generation.
 //    Example: TriangularPrism
 //
@@ -131,53 +131,49 @@ private:
 };
 } // namespace detail
 
-namespace TwoD {
-enum class PrimitiveType { Triangle, Plane };
+enum class Primitive2DType { Triangle, Plane };
 
-class Primitive final : public SceneObject, public detail::PrimitiveMesh {
+class Primitive2D final : public SceneObject, public detail::PrimitiveMesh {
 public:
-    Primitive(PrimitiveType type, const std::string& texturePath)
-        : PrimitiveMesh(type == PrimitiveType::Triangle
+    Primitive2D(Primitive2DType type, const std::string& texturePath)
+        : PrimitiveMesh(type == Primitive2DType::Triangle
                             ? detail::PrimitiveMeshType::Triangle
                             : detail::PrimitiveMeshType::Plane,
                         texturePath) {}
     std::string GetName() const final { return GetTypeName(); }
-    PrimitiveType GetPrimitiveType() const {
+    Primitive2DType GetPrimitiveType() const {
         return GetType() == detail::PrimitiveMeshType::Triangle
-            ? PrimitiveType::Triangle : PrimitiveType::Plane;
+            ? Primitive2DType::Triangle : Primitive2DType::Plane;
     }
 };
-} // namespace TwoD
 
-namespace ThreeD {
-enum class PrimitiveType { Cube, TriangularPrism, Sphere, Slab };
+enum class Primitive3DType { Cube, TriangularPrism, Sphere, Slab };
 
-class Primitive final : public SceneObject, public detail::PrimitiveMesh {
+class Primitive3D final : public SceneObject, public detail::PrimitiveMesh {
 public:
-    Primitive(PrimitiveType type, const std::string& texturePath,
+    Primitive3D(Primitive3DType type, const std::string& texturePath,
               unsigned int xSegments = 32, unsigned int ySegments = 32)
         : PrimitiveMesh(ToMeshType(type), texturePath, xSegments, ySegments) {}
     std::string GetName() const final { return GetTypeName(); }
-    PrimitiveType GetPrimitiveType() const;
+    Primitive3DType GetPrimitiveType() const;
 
 private:
-    static detail::PrimitiveMeshType ToMeshType(PrimitiveType type) {
+    static detail::PrimitiveMeshType ToMeshType(Primitive3DType type) {
         switch (type) {
-            case PrimitiveType::Cube: return detail::PrimitiveMeshType::Cube;
-            case PrimitiveType::TriangularPrism: return detail::PrimitiveMeshType::TriangularPrism;
-            case PrimitiveType::Sphere: return detail::PrimitiveMeshType::Sphere;
-            case PrimitiveType::Slab: return detail::PrimitiveMeshType::Slab;
+            case Primitive3DType::Cube: return detail::PrimitiveMeshType::Cube;
+            case Primitive3DType::TriangularPrism: return detail::PrimitiveMeshType::TriangularPrism;
+            case Primitive3DType::Sphere: return detail::PrimitiveMeshType::Sphere;
+            case Primitive3DType::Slab: return detail::PrimitiveMeshType::Slab;
         }
         return detail::PrimitiveMeshType::Cube;
     }
 };
 
-inline PrimitiveType Primitive::GetPrimitiveType() const {
+inline Primitive3DType Primitive3D::GetPrimitiveType() const {
     switch (GetType()) {
-        case detail::PrimitiveMeshType::TriangularPrism: return PrimitiveType::TriangularPrism;
-        case detail::PrimitiveMeshType::Sphere: return PrimitiveType::Sphere;
-        case detail::PrimitiveMeshType::Slab: return PrimitiveType::Slab;
-        default: return PrimitiveType::Cube;
+        case detail::PrimitiveMeshType::TriangularPrism: return Primitive3DType::TriangularPrism;
+        case detail::PrimitiveMeshType::Sphere: return Primitive3DType::Sphere;
+        case detail::PrimitiveMeshType::Slab: return Primitive3DType::Slab;
+        default: return Primitive3DType::Cube;
     }
 }
-} // namespace ThreeD

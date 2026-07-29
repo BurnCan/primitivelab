@@ -129,9 +129,9 @@ int main() {
     // ---------------- Scene Load ----------------
     if (!scene.loadScene(ResolveAssetPath("default.txt", "scenes").string())) {
         std::cout << "No scene found, creating default one...\n";
-        scene.AddSceneObject(std::make_unique<ThreeD::Primitive>(ThreeD::PrimitiveType::Cube, "textures/brick.jpg"));
-        scene.AddSceneObject(std::make_unique<ThreeD::Primitive>(ThreeD::PrimitiveType::TriangularPrism, "textures/wood.jpg"));
-        scene.AddSceneObject(std::make_unique<ThreeD::Primitive>(ThreeD::PrimitiveType::Sphere, "textures/earth.jpg",16,16));
+        scene.AddSceneObject(std::make_unique<Primitive3D>(Primitive3DType::Cube, "textures/brick.jpg"));
+        scene.AddSceneObject(std::make_unique<Primitive3D>(Primitive3DType::TriangularPrism, "textures/wood.jpg"));
+        scene.AddSceneObject(std::make_unique<Primitive3D>(Primitive3DType::Sphere, "textures/earth.jpg",16,16));
 
         Light light;
         light.position = glm::vec3(-2.0f,1.0f,-2.0f);

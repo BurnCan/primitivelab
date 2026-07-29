@@ -132,9 +132,9 @@ if (sceneManager.loadScene(defaultScenePath)) {
 } else {
     std::cout << "No scene found, creating default one...\n";
 
-    auto cube   = std::make_unique<ThreeD::Primitive>(ThreeD::PrimitiveType::Cube, "textures/brick.jpg");
-    auto prism  = std::make_unique<ThreeD::Primitive>(ThreeD::PrimitiveType::TriangularPrism, "textures/wood.jpg");
-    auto sphere = std::make_unique<ThreeD::Primitive>(ThreeD::PrimitiveType::Sphere, "textures/earth.jpg", 16, 16);
+    auto cube   = std::make_unique<Primitive3D>(Primitive3DType::Cube, "textures/brick.jpg");
+    auto prism  = std::make_unique<Primitive3D>(Primitive3DType::TriangularPrism, "textures/wood.jpg");
+    auto sphere = std::make_unique<Primitive3D>(Primitive3DType::Sphere, "textures/earth.jpg", 16, 16);
 
     sceneManager.AddSceneObject(std::move(cube));
     sceneManager.AddSceneObject(std::move(prism));
@@ -489,17 +489,17 @@ if (ImGui::BeginCombo("Texture##NewSceneObject", texturePreview)) {
 const std::string creationTexture = hasTextures ? textureFiles[newPrimitiveTextureIndex] : std::string{};
 if (!hasTextures) ImGui::BeginDisabled();
 ImGui::Text("Add 2D Primitive");
-if (ImGui::Button("Triangle")) sceneManager.AddSceneObject(std::make_unique<TwoD::Primitive>(TwoD::PrimitiveType::Triangle, creationTexture));
+if (ImGui::Button("Triangle")) sceneManager.AddSceneObject(std::make_unique<Primitive2D>(Primitive2DType::Triangle, creationTexture));
 ImGui::SameLine();
-if (ImGui::Button("Plane")) sceneManager.AddSceneObject(std::make_unique<TwoD::Primitive>(TwoD::PrimitiveType::Plane, creationTexture));
+if (ImGui::Button("Plane")) sceneManager.AddSceneObject(std::make_unique<Primitive2D>(Primitive2DType::Plane, creationTexture));
 ImGui::Text("Add 3D Primitive");
-if (ImGui::Button("Cube")) sceneManager.AddSceneObject(std::make_unique<ThreeD::Primitive>(ThreeD::PrimitiveType::Cube, creationTexture));
+if (ImGui::Button("Cube")) sceneManager.AddSceneObject(std::make_unique<Primitive3D>(Primitive3DType::Cube, creationTexture));
 ImGui::SameLine();
-if (ImGui::Button("Triangular Prism")) sceneManager.AddSceneObject(std::make_unique<ThreeD::Primitive>(ThreeD::PrimitiveType::TriangularPrism, creationTexture));
+if (ImGui::Button("Triangular Prism")) sceneManager.AddSceneObject(std::make_unique<Primitive3D>(Primitive3DType::TriangularPrism, creationTexture));
 ImGui::SameLine();
-if (ImGui::Button("Sphere")) sceneManager.AddSceneObject(std::make_unique<ThreeD::Primitive>(ThreeD::PrimitiveType::Sphere, creationTexture));
+if (ImGui::Button("Sphere")) sceneManager.AddSceneObject(std::make_unique<Primitive3D>(Primitive3DType::Sphere, creationTexture));
 ImGui::SameLine();
-if (ImGui::Button("Slab")) sceneManager.AddSceneObject(std::make_unique<ThreeD::Primitive>(ThreeD::PrimitiveType::Slab, creationTexture));
+if (ImGui::Button("Slab")) sceneManager.AddSceneObject(std::make_unique<Primitive3D>(Primitive3DType::Slab, creationTexture));
 if (!hasTextures) ImGui::EndDisabled();
 ImGui::Separator();
 
@@ -509,7 +509,7 @@ for (int i = 0; i < static_cast<int>(sceneObjects.size()); ++i) {
     SceneObject* object = sceneObjects[i].get();
     auto* prim = dynamic_cast<detail::PrimitiveMesh*>(object);
     if (!object || !prim) continue;
-    const char* category = object->GetDimension() == SceneDimension::TwoD ? "2D Primitive" : "3D Primitive";
+    const char* category = dynamic_cast<Primitive2D*>(object) ? "2D Primitive" : "3D Primitive";
     ImGui::PushID(i);
     const std::string heading = object->GetName() + " — " + category + "##" + std::to_string(i);
     if (ImGui::CollapsingHeader(heading.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
