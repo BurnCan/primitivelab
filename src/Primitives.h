@@ -4,13 +4,15 @@
 #include <vector>
 #include <glm/glm.hpp> // For modelMatrix
 #include <glm/gtc/matrix_transform.hpp>
+#include "SceneObject.h"
 
 
 // ---- How to Add a New Primitive ----
-// 1. Add a new value to the PrimitiveType enum in Primitives.h.
+// 1. Add a value to the appropriate TwoD/ThreeD PrimitiveType enum and to
+//    the internal PrimitiveMeshType used by mesh generation.
 //    Example: TriangularPrism
 //
-// 2. Declare a setup function for the new primitive in the Primitive class.
+// 2. Declare a setup function on PrimitiveMesh.
 //    Example: void setupTriangularPrism();
 //
 // 3. Implement the setup function in Primitives.cpp:
@@ -18,7 +20,7 @@
 //    - Define the indices for glDrawElements.
 //    - Call setupVAO(vertices, indices, stride); (stride = 3 for position-only, 8 for pos+norm+tex)
 //
-// 4. Update constructShapeMesh() to handle the new PrimitiveType value
+// 4. Update constructShapeMesh() to handle the new PrimitiveMeshType value
 //    and call the corresponding setup function.
 //
 // 5. Optionally, add a constructor overload if special parameters (like segments) are needed.
@@ -26,7 +28,8 @@
 // Utility: list all available textures in a directory
 std::vector<std::string> GetAvailableTextures(const std::string& dir);
 
-enum class PrimitiveType {
+namespace detail {
+enum class PrimitiveMeshType {
     Cube,
     TriangularPrism,
     Sphere,
@@ -35,22 +38,22 @@ enum class PrimitiveType {
     Slab
 };
 
-class Primitive {
+class PrimitiveMesh {
 public:
     // Public getters
     GLuint GetTextureID() const { return textureID; }
     const std::string& GetTexturePath() const { return texturePath; }
-    PrimitiveType GetType() const { return type; }
+    PrimitiveMeshType GetType() const { return type; }
 
     // New: get readable type name for UI
     std::string GetTypeName() const {
         switch (type) {
-            case PrimitiveType::Cube:            return "Cube";
-            case PrimitiveType::TriangularPrism: return "Triangular Prism";
-            case PrimitiveType::Sphere:          return "Sphere";
-            case PrimitiveType::Triangle:        return "Triangle";
-            case PrimitiveType::Plane:        return "Plane";
-            case PrimitiveType::Slab:        return "Slab";
+            case PrimitiveMeshType::Cube:            return "Cube";
+            case PrimitiveMeshType::TriangularPrism: return "Triangular Prism";
+            case PrimitiveMeshType::Sphere:          return "Sphere";
+            case PrimitiveMeshType::Triangle:        return "Triangle";
+            case PrimitiveMeshType::Plane:           return "Plane";
+            case PrimitiveMeshType::Slab:            return "Slab";
             default:                             return "Unknown";
         }
     }
@@ -64,10 +67,10 @@ public:
     glm::vec3 scale    {1.0f, 1.0f, 1.0f};
 
     // Constructors
-    Primitive(PrimitiveType type, const std::string& texturePath);
-    Primitive(PrimitiveType type, const std::string& texturePath,
+    PrimitiveMesh(PrimitiveMeshType type, const std::string& texturePath);
+    PrimitiveMesh(PrimitiveMeshType type, const std::string& texturePath,
               unsigned int xSeg, unsigned int ySeg);
-    ~Primitive();
+    ~PrimitiveMesh();
     // Draw
     void draw() const;
     void drawWireframe() const;
@@ -114,7 +117,7 @@ private:
     void loadTexture(const std::string& path);
 
     // Members
-    PrimitiveType type;
+    PrimitiveMeshType type;
     std::string texturePath;
     GLuint VAO = 0, VBO = 0, EBO = 0;
     GLuint textureID = 0;
@@ -126,3 +129,55 @@ private:
     unsigned int X_SEGMENTS = 32;
     unsigned int Y_SEGMENTS = 32;
 };
+} // namespace detail
+
+namespace TwoD {
+enum class PrimitiveType { Triangle, Plane };
+
+class Primitive final : public SceneObject, public detail::PrimitiveMesh {
+public:
+    Primitive(PrimitiveType type, const std::string& texturePath)
+        : PrimitiveMesh(type == PrimitiveType::Triangle
+                            ? detail::PrimitiveMeshType::Triangle
+                            : detail::PrimitiveMeshType::Plane,
+                        texturePath) {}
+    std::string GetName() const final { return GetTypeName(); }
+    PrimitiveType GetPrimitiveType() const {
+        return GetType() == detail::PrimitiveMeshType::Triangle
+            ? PrimitiveType::Triangle : PrimitiveType::Plane;
+    }
+};
+} // namespace TwoD
+
+namespace ThreeD {
+enum class PrimitiveType { Cube, TriangularPrism, Sphere, Slab };
+
+class Primitive final : public SceneObject, public detail::PrimitiveMesh {
+public:
+    Primitive(PrimitiveType type, const std::string& texturePath,
+              unsigned int xSegments = 32, unsigned int ySegments = 32)
+        : PrimitiveMesh(ToMeshType(type), texturePath, xSegments, ySegments) {}
+    std::string GetName() const final { return GetTypeName(); }
+    PrimitiveType GetPrimitiveType() const;
+
+private:
+    static detail::PrimitiveMeshType ToMeshType(PrimitiveType type) {
+        switch (type) {
+            case PrimitiveType::Cube: return detail::PrimitiveMeshType::Cube;
+            case PrimitiveType::TriangularPrism: return detail::PrimitiveMeshType::TriangularPrism;
+            case PrimitiveType::Sphere: return detail::PrimitiveMeshType::Sphere;
+            case PrimitiveType::Slab: return detail::PrimitiveMeshType::Slab;
+        }
+        return detail::PrimitiveMeshType::Cube;
+    }
+};
+
+inline PrimitiveType Primitive::GetPrimitiveType() const {
+    switch (GetType()) {
+        case detail::PrimitiveMeshType::TriangularPrism: return PrimitiveType::TriangularPrism;
+        case detail::PrimitiveMeshType::Sphere: return PrimitiveType::Sphere;
+        case detail::PrimitiveMeshType::Slab: return PrimitiveType::Slab;
+        default: return PrimitiveType::Cube;
+    }
+}
+} // namespace ThreeD

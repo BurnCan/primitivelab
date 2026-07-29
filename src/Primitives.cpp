@@ -31,14 +31,14 @@ std::vector<std::string> GetAvailableTextures(const std::string& dir) {
     return textures;
 }
 
-void Primitive::SetTexturePath(const std::string& newPath) {
+void detail::PrimitiveMesh::SetTexturePath(const std::string& newPath) {
     // Normalize to filename only
     fs::path cleanPath = fs::path(newPath).filename();
     texturePath = cleanPath.string();
     ReloadTexture();
 }
 
-void Primitive::ReloadTexture() {
+void detail::PrimitiveMesh::ReloadTexture() {
     if (textureID != 0) {
         glDeleteTextures(1, &textureID);
         textureID = 0;
@@ -66,7 +66,7 @@ void Primitive::ReloadTexture() {
 // 5. Optionally, add a constructor overload if special parameters (like segments) are needed.
 
 // ---------------- Constructors ----------------
-Primitive::Primitive(PrimitiveType type, const std::string& texturePath)
+detail::PrimitiveMesh::PrimitiveMesh(detail::PrimitiveMeshType type, const std::string& texturePath)
     : type(type)
 {
     // Normalize: always use only the filename
@@ -77,7 +77,7 @@ Primitive::Primitive(PrimitiveType type, const std::string& texturePath)
     loadTexture(this->texturePath);
 }
 
-Primitive::Primitive(PrimitiveType type, const std::string& texturePath, unsigned int xSeg, unsigned int ySeg)
+detail::PrimitiveMesh::PrimitiveMesh(detail::PrimitiveMeshType type, const std::string& texturePath, unsigned int xSeg, unsigned int ySeg)
     : type(type), X_SEGMENTS(xSeg), Y_SEGMENTS(ySeg)
 {
     // Normalize: always use only the filename
@@ -90,7 +90,7 @@ Primitive::Primitive(PrimitiveType type, const std::string& texturePath, unsigne
 
 
 // ---------------- Destructor ----------------
-Primitive::~Primitive() {
+detail::PrimitiveMesh::~PrimitiveMesh() {
     if (EBO) glDeleteBuffers(1, &EBO);
     if (VBO) glDeleteBuffers(1, &VBO);
     if (VAO) glDeleteVertexArrays(1, &VAO);
@@ -101,35 +101,35 @@ Primitive::~Primitive() {
 // ---------------- Mesh Construction Dispatcher ----------------
 // Selects the appropriate setup function to generate vertex/index buffers
 // and configure the VAO/VBO/EBO for this primitive type.
-//void Primitive::constructShapeMesh() {
+//void detail::PrimitiveMesh::constructShapeMesh() {
 //    switch (type) {
-//        case PrimitiveType::Cube:
+//        case detail::PrimitiveMeshType::Cube:
 //            setupCube();
 //            std::cout << "[DEBUG] Constructed Cube: VAO=" << VAO
 //                      << ", indexCount=" << indexCount << std::endl;
 //            break;
-//        case PrimitiveType::Sphere:
+//        case detail::PrimitiveMeshType::Sphere:
 //            setupSphere();
 //            std::cout << "[DEBUG] Constructed Sphere: VAO=" << VAO
 //                      << ", indexCount=" << indexCount
 //                      << ", Segments=" << X_SEGMENTS << "x" << Y_SEGMENTS << std::endl;
 //            break;
-//        case PrimitiveType::TriangularPrism:
+//        case detail::PrimitiveMeshType::TriangularPrism:
 //            setupTriangularPrism();
 //            std::cout << "[DEBUG] Constructed TriangularPrism: VAO=" << VAO
 //                      << ", indexCount=" << indexCount << std::endl;
 //            break;
-//        case PrimitiveType::Triangle:
+//        case detail::PrimitiveMeshType::Triangle:
  //           setupTriangle();
 //            std::cout << "[DEBUG] Constructed Triangle: VAO=" << VAO
 //                      << ", indexCount=" << indexCount << std::endl;
 //            break;
-//            case PrimitiveType::Plane:
+//            case detail::PrimitiveMeshType::Plane:
 //            setupPlane();
 //            std::cout << "[DEBUG] Constructed Plane: VAO=" << VAO
 //                      << ", indexCount=" << indexCount << std::endl;
 //            break;
-//            case PrimitiveType::Slab:
+//            case detail::PrimitiveMeshType::Slab:
 //            setupSlab();
 //            std::cout << "[DEBUG] Constructed Slab: VAO=" << VAO
 //                      << ", indexCount=" << indexCount << std::endl;
@@ -152,7 +152,7 @@ Primitive::~Primitive() {
 // 'stride' specifies the number of floats per vertex:
 //   3 = positions only (used by Triangle)
 //   8 = positions + normals + texcoords (used by Cube and Sphere)
-void Primitive::setupVAO(const std::vector<float>& vertices, const std::vector<unsigned int>& indices, int stride) {
+void detail::PrimitiveMesh::setupVAO(const std::vector<float>& vertices, const std::vector<unsigned int>& indices, int stride) {
     indexCount = static_cast<GLsizei>(indices.size());
     localIndices = indices;
 
@@ -188,7 +188,7 @@ void Primitive::setupVAO(const std::vector<float>& vertices, const std::vector<u
 
 
 // ---------------- Triangle setup ----------------
-void Primitive::setupTriangle() {
+void detail::PrimitiveMesh::setupTriangle() {
     //std::vector<float> vertices = {
     localVertices = {
         // positions       // normals       // texcoords
@@ -203,7 +203,7 @@ void Primitive::setupTriangle() {
 }
 
 // ---------------- Plane setup ----------------
-void Primitive::setupPlane() {
+void detail::PrimitiveMesh::setupPlane() {
     float h = 0.5f; // half size, makes a 1x1 unit plane
 
     //std::vector<float> vertices = {
@@ -224,7 +224,7 @@ void Primitive::setupPlane() {
 }
 
 // ---------------- Slab setup ----------------
-void Primitive::setupSlab() {
+void detail::PrimitiveMesh::setupSlab() {
     float width  = 1.0f;
     float depth  = 1.0f;
     float height = 0.1f;
@@ -291,7 +291,7 @@ void Primitive::setupSlab() {
 
 
 // ---------------- Cube setup ----------------
-void Primitive::setupCube() {
+void detail::PrimitiveMesh::setupCube() {
     //std::vector<float> vertices = {
     localVertices = {
         // positions         // normals        // texcoords
@@ -334,7 +334,7 @@ void Primitive::setupCube() {
 }
 
 // ---------------- Sphere setup ----------------
-void Primitive::setupSphere() {
+void detail::PrimitiveMesh::setupSphere() {
     localVertices.clear();
     std::vector<unsigned int> indices;
     const float PI = 3.14159265359f;
@@ -384,7 +384,7 @@ void Primitive::setupSphere() {
 
 
 
-void Primitive::setupTriangularPrism() {
+void detail::PrimitiveMesh::setupTriangularPrism() {
     float h = 1.0f;        // prism height along Y
     float halfBase = 0.5f; // triangle base along X
     float halfDepth = 0.5f; // triangle depth along Z
@@ -470,7 +470,7 @@ void Primitive::setupTriangularPrism() {
 
 
 // ---------------- Texture loading ----------------
-void Primitive::loadTexture(const std::string& path) {
+void detail::PrimitiveMesh::loadTexture(const std::string& path) {
     // Resolve absolute path relative to current directory
     fs::path texPath = ResolveAssetPath(path, "textures");
     std::cout << "[DEBUG] Attempting to load texture: " << texPath << std::endl;
@@ -522,14 +522,14 @@ void Primitive::loadTexture(const std::string& path) {
     stbi_image_free(data);
 }
 
-void Primitive::constructShapeMesh() {
+void detail::PrimitiveMesh::constructShapeMesh() {
     switch (type) {
-        case PrimitiveType::Cube:            setupCube(); break;
-        case PrimitiveType::TriangularPrism: setupTriangularPrism(); break;
-        case PrimitiveType::Sphere:          setupSphere(); break;
-        case PrimitiveType::Triangle:        setupTriangle(); break;
-        case PrimitiveType::Plane:           setupPlane(); break;
-        case PrimitiveType::Slab:            setupSlab(); break;
+        case detail::PrimitiveMeshType::Cube:            setupCube(); break;
+        case detail::PrimitiveMeshType::TriangularPrism: setupTriangularPrism(); break;
+        case detail::PrimitiveMeshType::Sphere:          setupSphere(); break;
+        case detail::PrimitiveMeshType::Triangle:        setupTriangle(); break;
+        case detail::PrimitiveMeshType::Plane:           setupPlane(); break;
+        case detail::PrimitiveMeshType::Slab:            setupSlab(); break;
         default: break;
     }
 
@@ -538,7 +538,7 @@ void Primitive::constructShapeMesh() {
 
 
 // ---------------- Draw ----------------
-void Primitive::draw() const {
+void detail::PrimitiveMesh::draw() const {
     glBindTexture(GL_TEXTURE_2D, textureID);
     glBindVertexArray(VAO);
     glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, 0);
@@ -547,7 +547,7 @@ void Primitive::draw() const {
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-void Primitive::drawWireframe() const {
+void detail::PrimitiveMesh::drawWireframe() const {
     glBindVertexArray(VAO);
     glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, nullptr);
     glBindVertexArray(0);
@@ -590,7 +590,7 @@ glm::vec3 ClosestPointOnTriangle(const glm::vec3& point, const glm::vec3& a,
 }
 }
 
-bool Primitive::IntersectsSphere(const glm::vec3& center, float radius,
+bool detail::PrimitiveMesh::IntersectsSphere(const glm::vec3& center, float radius,
                                  glm::vec3* contactNormal) const {
     const float radiusSquared = radius * radius;
     float closestDistanceSquared = radiusSquared;

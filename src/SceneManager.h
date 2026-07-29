@@ -41,9 +41,9 @@ public:
 
 
     // Scene management
-    const std::vector<std::unique_ptr<Primitive>>& GetPrimitives() const { return primitives; }
-    void AddPrimitive(std::unique_ptr<Primitive> prim) { primitives.push_back(std::move(prim)); }
-    bool RemovePrimitive(std::size_t index);
+    const std::vector<std::unique_ptr<SceneObject>>& GetSceneObjects() const { return sceneObjects; }
+    void AddSceneObject(std::unique_ptr<SceneObject> object) { sceneObjects.push_back(std::move(object)); }
+    bool RemoveSceneObject(std::size_t index);
 
      // Terrain access
     Terrain& GetTerrain() { return terrain; }
@@ -53,17 +53,17 @@ public:
     const std::vector<Light>& GetLights() const { return lights; } // read-only
     std::vector<Light>& GetLights() { return lights; }             // editable
 
-    //Clear lights and primitives
+    // Clear all owned scene objects and lights.
     void Clear() {
-    primitives.clear();
+    sceneObjects.clear();
     lights.clear();
     }
     void AddLight(const Light& light) { lights.push_back(light); }
 
 private:
-    std::vector<std::unique_ptr<Primitive>> primitives;
+    std::vector<std::unique_ptr<SceneObject>> sceneObjects;
     std::vector<Light> lights;
-    Primitive lightSphere { PrimitiveType::Sphere, "sun.jpg" }; // reusable light sphere
+    ThreeD::Primitive lightSphere { ThreeD::PrimitiveType::Sphere, "sun.jpg" }; // reusable light sphere
     std::string currentSceneFile; // ✅ track the currently opened scene
     Terrain terrain;   // member terrain
 };
