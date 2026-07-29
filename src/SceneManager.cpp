@@ -62,12 +62,12 @@ bool SceneManager::loadScene(const std::string& path) {
             if (!(iss >> texturePath >> px >> py >> pz >> rx >> ry >> rz >> sx >> sy >> sz)) continue;
 
             std::unique_ptr<::SceneObject> object;
-            if (primTypeStr == "Triangle") object = std::make_unique<TwoD::Primitive>(TwoD::PrimitiveType::Triangle, texturePath);
-            else if (primTypeStr == "Plane") object = std::make_unique<TwoD::Primitive>(TwoD::PrimitiveType::Plane, texturePath);
-            else if (primTypeStr == "TriangularPrism") object = std::make_unique<ThreeD::Primitive>(ThreeD::PrimitiveType::TriangularPrism, texturePath);
-            else if (primTypeStr == "Sphere") object = std::make_unique<ThreeD::Primitive>(ThreeD::PrimitiveType::Sphere, texturePath);
-            else if (primTypeStr == "Slab") object = std::make_unique<ThreeD::Primitive>(ThreeD::PrimitiveType::Slab, texturePath);
-            else object = std::make_unique<ThreeD::Primitive>(ThreeD::PrimitiveType::Cube, texturePath);
+            if (primTypeStr == "Triangle") object = std::make_unique<Primitive2D>(Primitive2DType::Triangle, texturePath);
+            else if (primTypeStr == "Plane") object = std::make_unique<Primitive2D>(Primitive2DType::Plane, texturePath);
+            else if (primTypeStr == "TriangularPrism") object = std::make_unique<Primitive3D>(Primitive3DType::TriangularPrism, texturePath);
+            else if (primTypeStr == "Sphere") object = std::make_unique<Primitive3D>(Primitive3DType::Sphere, texturePath);
+            else if (primTypeStr == "Slab") object = std::make_unique<Primitive3D>(Primitive3DType::Slab, texturePath);
+            else object = std::make_unique<Primitive3D>(Primitive3DType::Cube, texturePath);
             auto* prim = MeshFor(object.get());
             prim->position = glm::vec3(px, py, pz);
             prim->rotation = glm::vec3(rx, ry, rz);

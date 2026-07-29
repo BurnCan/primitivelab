@@ -63,7 +63,7 @@ public:
 private:
     std::vector<std::unique_ptr<SceneObject>> sceneObjects;
     std::vector<Light> lights;
-    ThreeD::Primitive lightSphere { ThreeD::PrimitiveType::Sphere, "sun.jpg" }; // reusable light sphere
+    Primitive3D lightSphere { Primitive3DType::Sphere, "sun.jpg" }; // reusable light sphere
     std::string currentSceneFile; // ✅ track the currently opened scene
     Terrain terrain;   // member terrain
 };
