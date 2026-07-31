@@ -112,6 +112,8 @@ int main() {
                   ResolveAssetPath("basic.frag", "shaders").string());
     Shader lightShader(ResolveAssetPath("light.vert", "shaders").string(),
                        ResolveAssetPath("light.frag", "shaders").string());
+    Shader skyboxShader(ResolveAssetPath("skybox.vert", "shaders").string(),
+                        ResolveAssetPath("skybox.frag", "shaders").string());
 
     // ---------------- SceneManager ----------------
     SceneManager scene;
@@ -190,10 +192,10 @@ int main() {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         if (useFPSCamera) {
-            scene.drawScene(shader, fpsCamera, SCR_WIDTH, SCR_HEIGHT);
+            scene.drawScene(shader, skyboxShader, fpsCamera, SCR_WIDTH, SCR_HEIGHT);
             scene.DrawLightGizmos(lightShader, fpsCamera, SCR_WIDTH, SCR_HEIGHT);
         } else {
-            scene.drawScene(shader, editorCamera, SCR_WIDTH, SCR_HEIGHT);
+            scene.drawScene(shader, skyboxShader, editorCamera, SCR_WIDTH, SCR_HEIGHT);
             scene.DrawLightGizmos(lightShader, editorCamera, SCR_WIDTH, SCR_HEIGHT);
         }
 

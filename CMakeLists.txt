@@ -62,6 +62,7 @@ set(COMMON_SOURCES
     src/Primitives.cpp
     src/SceneManager.cpp
     src/Terrain.cpp
+    src/Skybox.cpp
     src/Camera.cpp
     src/stb_image_impl.cpp
 )

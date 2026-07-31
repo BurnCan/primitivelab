@@ -45,6 +45,8 @@ const std::string SHADER_DIR = ResolveAssetPath("basic.vert", "shaders").parent_
 //Bounding box
 static bool showCollisionMeshes = false;
 static bool showTerrainMesh = false;
+static Skybox* pendingSkybox = nullptr;
+static char pendingSkyboxPaths[6][512]{};
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
     SCR_WIDTH = width;
@@ -124,6 +126,7 @@ int main() {
     Shader shader(SHADER_DIR + "basic.vert", SHADER_DIR + "basic.frag");
     Shader lightShader(SHADER_DIR + "light.vert", SHADER_DIR + "light.frag");
     Shader boundingBoxShader(SHADER_DIR + "boundingBox.vert", SHADER_DIR + "boundingBox.frag");
+    Shader skyboxShader(SHADER_DIR + "skybox.vert", SHADER_DIR + "skybox.frag");
     // ---------------- SceneManager ----------------
 SceneManager sceneManager;
 std::string currentSceneFile; // track currently loaded/saved scene path
@@ -224,6 +227,7 @@ glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         if (ImGui::MenuItem("New Scene", "Ctrl+N")) {
     // Clear current scene
     sceneManager.Clear();
+    pendingSkybox = nullptr;
     currentSceneFile.clear();
 
     // Prompt for a filename
@@ -258,6 +262,7 @@ glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
             );
             if (path) {
                 if (sceneManager.loadScene(path)) {
+                    pendingSkybox = nullptr;
                     currentSceneFile = path;
                     std::cout << "Opened scene: " << path << std::endl;
                 } else {
@@ -398,7 +403,7 @@ if (sceneFocused) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // Draw all scene objects via SceneManager.
-        sceneManager.drawScene(shader,
+        sceneManager.drawScene(shader, skyboxShader,
                        useFPSCamera ? fpsCamera : editorCamera,
                        SCR_WIDTH,
                        SCR_HEIGHT);
@@ -434,20 +439,30 @@ if (ImGui::Button("Add Cube")) sceneManager.AddPrimitive3D(Primitive3DType::Cube
 ImGui::SameLine(); if (ImGui::Button("Add Plane")) sceneManager.AddPrimitive2D(Primitive2DType::Plane, creationTexture);
 ImGui::SameLine(); if (ImGui::Button("Add Terrain")) { auto& o=sceneManager.AddTerrain(); std::get<Terrain>(o.payload).SetTexturePath(creationTexture); }
 ImGui::SameLine(); if (ImGui::Button("Add Light Only")) sceneManager.AddLight();
+if (!sceneManager.GetSkybox()) {
+ ImGui::SameLine(); if (ImGui::Button("Add Skybox")) sceneManager.AddSkybox();
+}
 auto& objects=sceneManager.GetSceneObjects(); int objectToDelete=-1;
 for(int i=0;i<int(objects.size());++i){auto& o=*objects[i];ImGui::PushID(i);
  if(ImGui::CollapsingHeader(o.name.c_str())){char name[128];std::snprintf(name,sizeof(name),"%s",o.name.c_str());if(ImGui::InputText("Name",name,sizeof(name)))o.name=name;
   ImGui::Checkbox("Enabled",&o.enabled);ImGui::SameLine();ImGui::Checkbox("Visible",&o.visible);
-  ImGui::DragFloat3("Position",&o.transform.position.x,.05f);ImGui::DragFloat3("Rotation",&o.transform.rotation.x,.5f);ImGui::DragFloat3("Scale",&o.transform.scale.x,.05f,.01f,100.f);
+  const bool isSkybox=std::holds_alternative<Skybox>(o.payload);
+  if(!isSkybox)ImGui::DragFloat3("Position",&o.transform.position.x,.05f);ImGui::DragFloat3("Rotation",&o.transform.rotation.x,.5f);if(!isSkybox)ImGui::DragFloat3("Scale",&o.transform.scale.x,.05f,.01f,100.f);
   std::visit([&](auto& payload){using T=std::decay_t<decltype(payload)>;
    if constexpr(std::is_same_v<T,Primitive2D>||std::is_same_v<T,Primitive3D>){ImGui::Text("Primitive: %s",payload.GetTypeName().c_str());ImGui::Text("Texture: %s",payload.GetTexturePath().c_str());}
    else if constexpr(std::is_same_v<T,Terrain>){auto& c=payload.GetConfig();ImGui::Text("Terrain: %s / %s",c.geometryType==TerrainGeometryType::Flat?"Flat":"Heightmap",c.plane==TerrainPlane::XY?"XY":c.plane==TerrainPlane::YZ?"YZ":"XZ");ImGui::Text("%d x %d segments, %.1f x %.1f",c.widthSegments,c.depthSegments,c.width,c.depth);ImGui::Text("Texture: %s",payload.GetTexturePath().c_str());}
+   else if constexpr(std::is_same_v<T,Skybox>){
+    if(pendingSkybox!=&payload){pendingSkybox=&payload;auto&c=payload.GetConfig();const std::string* values[]={&c.right,&c.left,&c.top,&c.bottom,&c.front,&c.back};for(int n=0;n<6;++n)std::snprintf(pendingSkyboxPaths[n],sizeof(pendingSkyboxPaths[n]),"%s",values[n]->c_str());}
+    const char* labels[]={"Right (+X)","Left (-X)","Top (+Y)","Bottom (-Y)","Front (+Z)","Back (-Z)"};for(int n=0;n<6;++n)ImGui::InputText(labels[n],pendingSkyboxPaths[n],sizeof(pendingSkyboxPaths[n]));
+    if(ImGui::Button("Reload Cubemap")){SkyboxConfig c{pendingSkyboxPaths[0],pendingSkyboxPaths[1],pendingSkyboxPaths[2],pendingSkyboxPaths[3],pendingSkyboxPaths[4],pendingSkyboxPaths[5]};if(payload.Reload(c))std::cout<<"[Skybox] Cubemap reloaded\n";}
+    if(!payload.GetLastError().empty())ImGui::TextWrapped("Error: %s",payload.GetLastError().c_str());
+   }
    else ImGui::TextUnformatted("No renderable payload");},o.payload);
-  if(o.light){int type=int(o.light->type);const char* types[]={"Point","Directional","Spot"};ImGui::Combo("Light Type",&type,types,3);o.light->type=LightType(type);ImGui::ColorEdit3("Light Color",&o.light->color.x);ImGui::DragFloat("Intensity",&o.light->intensity,.05f,0);ImGui::DragFloat("Range",&o.light->range,.1f,0);ImGui::DragFloat("Inner Cone",&o.light->innerConeAngle,.5f,0,180);ImGui::DragFloat("Outer Cone",&o.light->outerConeAngle,.5f,0,180);if(ImGui::Button("Remove Light Component"))o.light.reset();}
-  else if(ImGui::Button("Add Light Component"))o.light.emplace();
+  if(!isSkybox&&o.light){int type=int(o.light->type);const char* types[]={"Point","Directional","Spot"};ImGui::Combo("Light Type",&type,types,3);o.light->type=LightType(type);ImGui::ColorEdit3("Light Color",&o.light->color.x);ImGui::DragFloat("Intensity",&o.light->intensity,.05f,0);ImGui::DragFloat("Range",&o.light->range,.1f,0);ImGui::DragFloat("Inner Cone",&o.light->innerConeAngle,.5f,0,180);ImGui::DragFloat("Outer Cone",&o.light->outerConeAngle,.5f,0,180);if(ImGui::Button("Remove Light Component"))o.light.reset();}
+  else if(!isSkybox&&!o.light&&ImGui::Button("Add Light Component"))o.light.emplace();
   if(ImGui::Button("Delete Object"))objectToDelete=i;
  }ImGui::PopID();}
-if(objectToDelete>=0)sceneManager.RemoveSceneObject(objectToDelete);
+if(objectToDelete>=0){if(std::holds_alternative<Skybox>(objects[objectToDelete]->payload))pendingSkybox=nullptr;sceneManager.RemoveSceneObject(objectToDelete);}
 ImGui::End();
 
 // ---------------- Debug Window ----------------

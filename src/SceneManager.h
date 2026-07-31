@@ -12,7 +12,7 @@ public:
     SceneManager();
     bool loadScene(const std::string& filepath);
     bool saveScene(const std::string& filepath);
-    void drawScene(const Shader&, Camera&, int, int);
+    void drawScene(const Shader&, const Shader&, Camera&, int, int);
     void DrawLightGizmos(const Shader&, Camera&, int, int);
     bool CheckCollision(const glm::vec3&, float radius = FPS_CAMERA_COLLISION_RADIUS, glm::vec3* = nullptr);
     void DrawDebugWindow();
@@ -24,6 +24,9 @@ public:
     SceneObject& AddPrimitive2D(Primitive2DType, const std::string&);
     SceneObject& AddPrimitive3D(Primitive3DType, const std::string&, unsigned = 32, unsigned = 32);
     SceneObject& AddTerrain(const TerrainConfig& = {});
+    SceneObject& AddSkybox(const SkyboxConfig& = {});
+    SceneObject* GetSkybox();
+    const SceneObject* GetSkybox() const;
     SceneObject& AddLight();
     void Clear() { sceneObjects.clear(); }
 private:
