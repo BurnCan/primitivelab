@@ -8,14 +8,19 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include "Primitives.h"
 #include "Terrain.h"
+#include "Skybox.h"
 
 struct Transform {
     glm::vec3 position{0.0f}, rotation{0.0f}, scale{1.0f};
-    glm::mat4 Matrix() const {
-        glm::mat4 result = glm::translate(glm::mat4(1.0f), position);
+    glm::mat4 RotationMatrix() const {
+        glm::mat4 result(1.0f);
         result = glm::rotate(result, glm::radians(rotation.z), {0,0,1});
         result = glm::rotate(result, glm::radians(rotation.y), {0,1,0});
-        result = glm::rotate(result, glm::radians(rotation.x), {1,0,0});
+        return glm::rotate(result, glm::radians(rotation.x), {1,0,0});
+    }
+    glm::mat4 Matrix() const {
+        glm::mat4 result = glm::translate(glm::mat4(1.0f), position);
+        result *= RotationMatrix();
         return glm::scale(result, scale);
     }
     glm::vec3 Forward() const {
@@ -29,7 +34,7 @@ struct LightComponent {
     float intensity = 1.0f, range = 10.0f;
     float innerConeAngle = 20.0f, outerConeAngle = 30.0f;
 };
-using SceneObjectPayload = std::variant<std::monostate, Primitive2D, Primitive3D, Terrain>;
+using SceneObjectPayload = std::variant<std::monostate, Primitive2D, Primitive3D, Terrain, Skybox>;
 
 class SceneObject {
 public:
