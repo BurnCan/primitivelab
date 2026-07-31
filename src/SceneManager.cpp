@@ -1,301 +1,33 @@
 #include "SceneManager.h"
-#include "Camera.h"
-#include "Terrain.h"
+#include <algorithm>
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <type_traits>
 #include <glad/glad.h>
-#include <glm/gtc/type_ptr.hpp>
-#include <algorithm>
+#include <glm/gtc/matrix_inverse.hpp>
 
 namespace {
-detail::PrimitiveMesh* MeshFor(SceneObject* object) {
-    return dynamic_cast<detail::PrimitiveMesh*>(object);
+detail::PrimitiveMesh* Mesh(SceneObjectPayload& p) { return std::visit([](auto& v)->detail::PrimitiveMesh* { using T=std::decay_t<decltype(v)>; if constexpr(std::is_same_v<T,Primitive2D>||std::is_same_v<T,Primitive3D>) return &v; return nullptr; },p); }
+const detail::PrimitiveMesh* Mesh(const SceneObjectPayload& p) { return std::visit([](const auto& v)->const detail::PrimitiveMesh* { using T=std::decay_t<decltype(v)>; if constexpr(std::is_same_v<T,Primitive2D>||std::is_same_v<T,Primitive3D>) return &v; return nullptr; },p); }
+const char* GeometryName(TerrainGeometryType t){return t==TerrainGeometryType::Flat?"Flat":"Heightmap";}
+const char* PlaneName(TerrainPlane p){return p==TerrainPlane::XY?"XY":p==TerrainPlane::YZ?"YZ":"XZ";}
 }
-const detail::PrimitiveMesh* MeshFor(const SceneObject* object) {
-    return dynamic_cast<const detail::PrimitiveMesh*>(object);
-}
-}
-
-//Terrain
-SceneManager::SceneManager()
-    : terrain(20, 20, 1.0f) // width, depth, scale for terrain
-{
-    // Optionally set a default texture for terrain
-    terrain.SetTexturePath("../textures/grass.jpg");
-
-}
-
-bool SceneManager::RemoveSceneObject(std::size_t index) {
-    if (index >= sceneObjects.size()) return false;
-
-    sceneObjects.erase(sceneObjects.begin() + static_cast<std::ptrdiff_t>(index));
-    return true;
-}
-
-// Persistent light sphere
-//SceneManager::SceneManager()
-    //: lightSphere(detail::PrimitiveMeshType::Sphere, "sun.jpg", 16, 16) {}
-
-bool SceneManager::loadScene(const std::string& path) {
-    std::ifstream file(path);
-    if (!file.is_open()) {
-        std::cerr << "Failed to open scene file: " << path << std::endl;
-        return false;
-    }
-
-    sceneObjects.clear();
-    lights.clear();
-
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip comments or empty lines
-        if (line.empty() || line[0] == '#') continue;
-
-        std::istringstream iss(line);
-        std::string primTypeStr, texturePath;
-        float px, py, pz, rx, ry, rz, sx, sy, sz;
-
-        if (!(iss >> primTypeStr)) continue;
-
-        if (primTypeStr == "Cube" || primTypeStr == "TriangularPrism" || primTypeStr == "Sphere" || primTypeStr == "Plane" || primTypeStr == "Slab" || primTypeStr == "Triangle") {
-            if (!(iss >> texturePath >> px >> py >> pz >> rx >> ry >> rz >> sx >> sy >> sz)) continue;
-
-            std::unique_ptr<::SceneObject> object;
-            if (primTypeStr == "Triangle") object = std::make_unique<Primitive2D>(Primitive2DType::Triangle, texturePath);
-            else if (primTypeStr == "Plane") object = std::make_unique<Primitive2D>(Primitive2DType::Plane, texturePath);
-            else if (primTypeStr == "TriangularPrism") object = std::make_unique<Primitive3D>(Primitive3DType::TriangularPrism, texturePath);
-            else if (primTypeStr == "Sphere") object = std::make_unique<Primitive3D>(Primitive3DType::Sphere, texturePath);
-            else if (primTypeStr == "Slab") object = std::make_unique<Primitive3D>(Primitive3DType::Slab, texturePath);
-            else object = std::make_unique<Primitive3D>(Primitive3DType::Cube, texturePath);
-            auto* prim = MeshFor(object.get());
-            prim->position = glm::vec3(px, py, pz);
-            prim->rotation = glm::vec3(rx, ry, rz);
-            prim->scale    = glm::vec3(sx, sy, sz);
-            prim->UpdateModelMatrix();
-
-            AddSceneObject(std::move(object));
-        }
-        else if (primTypeStr == "Light") {
-            Light light;
-            float r, g, b;
-            if (!(iss >> px >> py >> pz >> r >> g >> b)) continue;
-            light.position = glm::vec3(px, py, pz);
-            light.color    = glm::vec3(r, g, b);
-            lights.push_back(light);
-        }
-    }
-
-    return true;
-}
-
-bool SceneManager::saveScene(const std::string& path) {
-    std::ofstream file(path);
-    if (!file.is_open()) {
-        std::cerr << "Failed to open scene file for writing: " << path << std::endl;
-        return false;
-    }
-
-    // Comment header explaining format
-    file << "# Scene file format:\n";
-    file << "# PrimitiveType TexturePath posX posY posZ rotX rotY rotZ scaleX scaleY scaleZ\n";
-    file << "# Light posX posY posZ colorR colorG colorB\n";
-
-    // Save sceneObjects
-    for (const auto& object : sceneObjects) {
-        const auto* prim = MeshFor(object.get());
-        if (!prim) continue; // Future model objects can define their own serialization.
-        std::string typeName = prim->GetTypeName();
-
-        //remove any spaces from typename to avoid conflict with scene file format
-        //while preserving readability for the UI (see GetTypeName in Primitives.h )
-        typeName.erase(std::remove(typeName.begin(), typeName.end(), ' '), typeName.end());
-
-        file << typeName << " "
-             << prim->GetTexturePath() << " "
-             << prim->position.x << " " << prim->position.y << " " << prim->position.z << " "
-             << prim->rotation.x << " " << prim->rotation.y << " " << prim->rotation.z << " "
-             << prim->scale.x << " " << prim->scale.y << " " << prim->scale.z << "\n";
-    }
-
-    // Save lights
-    for (const auto& light : lights) {
-        file << "Light "
-             << light.position.x << " " << light.position.y << " " << light.position.z << " "
-             << light.color.r << " " << light.color.g << " " << light.color.b << "\n";
-    }
-
-    return true;
-}
-
-
-
-void SceneManager::drawScene(const Shader& shader, Camera& camera, int width, int height)
-{
-    // --- Ensure OpenGL state ---
-    //glEnable(GL_DEPTH_TEST);
-    //glEnable(GL_CULL_FACE);
-    //glCullFace(GL_BACK);
-    //glFrontFace(GL_CCW); // Assuming your vertices are CCW
-    //glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-
-    // --- Use shader ---
-    shader.Use();
-
-    // --- View and Projection from camera ---
-    glm::mat4 view       = camera.GetViewMatrix();
-    glm::mat4 projection = camera.GetProjectionMatrix(width, height);
-
-    shader.SetMat4("view", view);
-    shader.SetMat4("projection", projection);
-    shader.SetVec3("viewPos", camera.Position);
-
-    // --- Set lights ---
-    int count = std::min((int)lights.size(), 10); // max 10 lights
-    shader.SetInt("numLights", count);
-    for (int i = 0; i < count; ++i) {
-        std::string base = "lights[" + std::to_string(i) + "]";
-        shader.SetVec3(base + ".position", lights[i].position);
-        shader.SetVec3(base + ".color", lights[i].color);
-        shader.SetFloat(base + ".shininess", 32.0f);
-    }
-
-    // --- Draw sceneObjects ---
-    for (auto& object : sceneObjects) {
-        auto* prim = MeshFor(object.get());
-        if (!prim) continue;
-        shader.SetInt("texture1", 0);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, prim->GetTextureID());
-
-        // Make sure model matrix is updated correctly
-        prim->UpdateModelMatrix();
-        shader.SetMat4("model", prim->modelMatrix);
-
-        prim->draw();
-    }
-
-    // --- Draw terrain ---
-    shader.SetInt("texture1", 0);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, terrain.GetTextureID());
-
-    glm::mat4 terrainModel = glm::mat4(1.0f); // identity
-    shader.SetMat4("model", terrainModel);
-
-    terrain.Draw(shader.ID);
-}
-
-
-
-
-
-bool SceneManager::CheckCollision(const glm::vec3& point, float radius,
-                                  glm::vec3* contactNormal) {
-    if (terrain.IntersectsSphere(point, radius, contactNormal)) return true;
-
-    for (const auto& object : sceneObjects) {
-        auto* primitive = MeshFor(object.get());
-        if (!primitive) continue;
-        primitive->UpdateModelMatrix();
-        if (primitive->IntersectsSphere(point, radius, contactNormal)) return true;
-    }
-    return false;
-}
-
-
-
-
-
-void SceneManager::drawLights(const Shader& lightShader, Camera& camera, int width, int height)
-{
-    lightShader.Use();  // make sure the shader is active
-
-    // ----- Matrices -----
-    glm::mat4 view       = camera.GetViewMatrix();
-    glm::mat4 projection = camera.GetProjectionMatrix(width, height); // use Camera helper
-
-    lightShader.SetMat4("view", view);
-    lightShader.SetMat4("projection", projection);
-
-    // ----- Draw each light as a small sphere -----
-    for (const auto& light : lights) {
-        glm::mat4 model = glm::translate(glm::mat4(1.0f), light.position);
-        model = glm::scale(model, glm::vec3(0.1f)); // tiny sphere
-        lightShader.SetMat4("model", model);
-        lightShader.SetVec3("lightColor", light.color);
-
-        lightSphere.draw(); // your mesh for a sphere
-    }
-}
-
-
-void SceneManager::DrawCollisionMeshes(const Shader& shader, const Camera& camera, int width, int height,
-                                       bool drawPrimitiveMeshes, bool drawTerrainMesh)
-{
-    // Backup minimal GL state we change
-    GLint polygonMode[2];
-    glGetIntegerv(GL_POLYGON_MODE, polygonMode);
-    GLboolean depthTestEnabled = glIsEnabled(GL_DEPTH_TEST);
-    GLboolean cullFaceEnabled = glIsEnabled(GL_CULL_FACE);
-    GLint prevArrayBuffer = 0; glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &prevArrayBuffer);
-    GLint prevElementArray = 0; glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &prevElementArray);
-
-    // Use shader and upload camera matrices
-    Shader& mutableShader = const_cast<Shader&>(shader);
-    mutableShader.Use();
-    mutableShader.SetMat4("view", camera.GetViewMatrix());
-
-    // If Camera doesn't provide a projection helper, compute here:
-    //glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), static_cast<float>(width) / static_cast<float>(height), 0.1f, 100.0f);
-    //mutableShader.SetMat4("projection", projection);
-    mutableShader.SetMat4("projection", camera.GetProjectionMatrix(width, height));
-
-
-
-    // green color for boxes
-    mutableShader.SetVec3("color", glm::vec3(0.0f, 1.0f, 0.0f));
-
-    // draw in wireframe
-    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-
-    // Keep depth testing ON, but ensure we do NOT write to depth buffer
-    if (!depthTestEnabled) glEnable(GL_DEPTH_TEST);
-    glDepthMask(GL_FALSE); // don't write depth so boxes don't occlude later draws
-
-    // Optionally enable line smoothing if desired (not necessary)
-    // glEnable(GL_LINE_SMOOTH);
-
-    if (drawPrimitiveMeshes) {
-        for (const auto& object : sceneObjects)
-        {
-            const auto* mesh = MeshFor(object.get());
-            if (!mesh) continue;
-            const detail::PrimitiveMesh& prim = *mesh;
-            const_cast<detail::PrimitiveMesh&>(prim).UpdateModelMatrix();
-            mutableShader.SetMat4("model", prim.modelMatrix);
-            prim.drawWireframe();
-        }
-    }
-
-    if (drawTerrainMesh) {
-        mutableShader.SetVec3("color", glm::vec3(1.0f, 0.65f, 0.0f));
-        mutableShader.SetMat4("model", glm::mat4(1.0f));
-        terrain.DrawWireframe();
-    }
-
-    // restore depth mask and polygon mode and bindings
-    glDepthMask(GL_TRUE);
-    if (!depthTestEnabled) glDisable(GL_DEPTH_TEST);
-
-    glPolygonMode(GL_FRONT_AND_BACK, polygonMode[0]);
-
-    // restore bindings
-    glBindBuffer(GL_ARRAY_BUFFER, prevArrayBuffer);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, prevElementArray);
-
-    if (!cullFaceEnabled) glDisable(GL_CULL_FACE);
-
-    glUseProgram(0);
-
-}
+SceneManager::SceneManager(){ auto& t=AddTerrain(); std::get<Terrain>(t.payload).SetTexturePath("textures/grass.jpg"); }
+SceneObject& SceneManager::AddPrimitive2D(Primitive2DType t,const std::string& x){ auto o=std::make_unique<SceneObject>(t==Primitive2DType::Triangle?"Triangle":"Plane",std::in_place_type<Primitive2D>,t,x); sceneObjects.push_back(std::move(o)); return *sceneObjects.back(); }
+SceneObject& SceneManager::AddPrimitive3D(Primitive3DType t,const std::string& x,unsigned a,unsigned b){ auto o=std::make_unique<SceneObject>("Primitive",std::in_place_type<Primitive3D>,t,x,a,b); o->name=std::get<Primitive3D>(o->payload).GetTypeName(); sceneObjects.push_back(std::move(o)); return *sceneObjects.back(); }
+SceneObject& SceneManager::AddTerrain(const TerrainConfig& c){ auto o=std::make_unique<SceneObject>("Terrain",std::in_place_type<Terrain>,c); sceneObjects.push_back(std::move(o)); return *sceneObjects.back(); }
+SceneObject& SceneManager::AddLight(){ auto o=std::make_unique<SceneObject>("Light",std::in_place_type<std::monostate>); o->transform.position={0,1,0}; o->light.emplace(); sceneObjects.push_back(std::move(o)); return *sceneObjects.back(); }
+bool SceneManager::RemoveSceneObject(std::size_t i){if(i>=sceneObjects.size())return false;sceneObjects.erase(sceneObjects.begin()+i);return true;}
+
+bool SceneManager::loadScene(const std::string& path){std::ifstream f(path);if(!f)return false;Clear();auto& defaultTerrain=AddTerrain();std::get<Terrain>(defaultTerrain.payload).SetTexturePath("textures/grass.jpg");bool foundTerrain=false;std::string line;while(std::getline(f,line)){if(line.empty()||line[0]=='#')continue;std::istringstream s(line);std::string type,tex;s>>type;float px,py,pz,rx,ry,rz,sx,sy,sz;
+ if(type=="Light"){std::string token;s>>token;auto& o=AddLight();float r,g,b;if(token=="Point"||token=="Directional"||token=="Spot"){o.light->type=token=="Spot"?LightType::Spot:token=="Directional"?LightType::Directional:LightType::Point;s>>px>>py>>pz>>rx>>ry>>rz>>r>>g>>b>>o.light->intensity>>o.light->range>>o.light->innerConeAngle>>o.light->outerConeAngle;o.transform.rotation={rx,ry,rz};}else{px=std::stof(token);s>>py>>pz>>r>>g>>b;}o.transform.position={px,py,pz};o.light->color={r,g,b};continue;}
+ if(type=="Terrain"){if(!foundTerrain){sceneObjects.erase(std::remove_if(sceneObjects.begin(),sceneObjects.end(),[](const auto& o){return std::holds_alternative<Terrain>(o->payload);}),sceneObjects.end());foundTerrain=true;}std::string geo,plane,heightmap;s>>geo>>plane>>tex;TerrainConfig c;c.geometryType=geo=="Heightmap"?TerrainGeometryType::Heightmap:TerrainGeometryType::Flat;c.plane=plane=="XY"?TerrainPlane::XY:plane=="YZ"?TerrainPlane::YZ:TerrainPlane::XZ;s>>c.widthSegments>>c.depthSegments>>c.width>>c.depth>>c.heightScale>>px>>py>>pz>>rx>>ry>>rz>>sx>>sy>>sz;auto&o=AddTerrain(c);std::get<Terrain>(o.payload).SetTexturePath(tex);o.transform={{px,py,pz},{rx,ry,rz},{sx,sy,sz}};continue;}
+ if(!(s>>tex>>px>>py>>pz>>rx>>ry>>rz>>sx>>sy>>sz))continue;SceneObject* o=nullptr;if(type=="Triangle")o=&AddPrimitive2D(Primitive2DType::Triangle,tex);else if(type=="Plane")o=&AddPrimitive2D(Primitive2DType::Plane,tex);else {auto t=type=="Sphere"?Primitive3DType::Sphere:type=="Slab"?Primitive3DType::Slab:type=="TriangularPrism"?Primitive3DType::TriangularPrism:Primitive3DType::Cube;o=&AddPrimitive3D(t,tex);}o->transform={{px,py,pz},{rx,ry,rz},{sx,sy,sz}};}return true;}
+
+bool SceneManager::saveScene(const std::string& path){std::ofstream f(path);if(!f)return false;f<<"# PrimitiveType TexturePath position rotation scale\n# Terrain geometry plane texture segments dimensions heightScale position rotation scale\n# Light legacy or: Light Type position rotation color intensity range innerAngle outerAngle\n";for(auto&op:sceneObjects){auto&o=*op;if(auto*m=Mesh(o.payload)){std::string n=m->GetTypeName();n.erase(std::remove(n.begin(),n.end(),' '),n.end());auto&t=o.transform;f<<n<<' '<<m->GetTexturePath()<<' '<<t.position.x<<' '<<t.position.y<<' '<<t.position.z<<' '<<t.rotation.x<<' '<<t.rotation.y<<' '<<t.rotation.z<<' '<<t.scale.x<<' '<<t.scale.y<<' '<<t.scale.z<<'\n';}else if(auto*t=std::get_if<Terrain>(&o.payload)){auto&c=t->GetConfig();auto&x=o.transform;f<<"Terrain "<<GeometryName(c.geometryType)<<' '<<PlaneName(c.plane)<<' '<<t->GetTexturePath()<<' '<<c.widthSegments<<' '<<c.depthSegments<<' '<<c.width<<' '<<c.depth<<' '<<c.heightScale<<' '<<x.position.x<<' '<<x.position.y<<' '<<x.position.z<<' '<<x.rotation.x<<' '<<x.rotation.y<<' '<<x.rotation.z<<' '<<x.scale.x<<' '<<x.scale.y<<' '<<x.scale.z<<'\n';}if(o.light){auto&l=*o.light;auto&x=o.transform;const char* type=l.type==LightType::Spot?"Spot":l.type==LightType::Directional?"Directional":"Point";f<<"Light "<<type<<' '<<x.position.x<<' '<<x.position.y<<' '<<x.position.z<<' '<<x.rotation.x<<' '<<x.rotation.y<<' '<<x.rotation.z<<' '<<l.color.r<<' '<<l.color.g<<' '<<l.color.b<<' '<<l.intensity<<' '<<l.range<<' '<<l.innerConeAngle<<' '<<l.outerConeAngle<<'\n';}}return true;}
+
+void SceneManager::drawScene(const Shader&s,Camera&c,int w,int h){s.Use();s.SetMat4("view",c.GetViewMatrix());s.SetMat4("projection",c.GetProjectionMatrix(w,h));s.SetVec3("viewPos",c.Position);int i=0;for(auto&o:sceneObjects)if(o->enabled&&o->light&&i<10){auto b="lights["+std::to_string(i++)+"]";s.SetVec3(b+".position",o->transform.position);s.SetVec3(b+".color",o->light->color*o->light->intensity);s.SetFloat(b+".shininess",32);}s.SetInt("numLights",i);for(auto&o:sceneObjects){if(!o->enabled||!o->visible)continue;s.SetMat4("model",o->transform.Matrix());std::visit([&](auto&v){using T=std::decay_t<decltype(v)>;if constexpr(std::is_same_v<T,Primitive2D>||std::is_same_v<T,Primitive3D>){glActiveTexture(GL_TEXTURE0);glBindTexture(GL_TEXTURE_2D,v.GetTextureID());v.draw();}else if constexpr(std::is_same_v<T,Terrain>){glActiveTexture(GL_TEXTURE0);glBindTexture(GL_TEXTURE_2D,v.GetTextureID());v.Draw(s.ID);}},o->payload);}}
+void SceneManager::DrawLightGizmos(const Shader&s,Camera&c,int w,int h){s.Use();s.SetMat4("view",c.GetViewMatrix());s.SetMat4("projection",c.GetProjectionMatrix(w,h));for(auto&o:sceneObjects)if(o->enabled&&o->light){s.SetMat4("model",glm::scale(glm::translate(glm::mat4(1),o->transform.position),glm::vec3(.1f)));s.SetVec3("lightColor",o->light->color);lightGizmoSphere.draw();}}
+bool SceneManager::CheckCollision(const glm::vec3&p,float r,glm::vec3*n){for(auto&o:sceneObjects){if(!o->enabled)continue;if(auto*m=Mesh(o->payload)){m->modelMatrix=o->transform.Matrix();if(m->IntersectsSphere(p,r,n))return true;}else if(auto*t=std::get_if<Terrain>(&o->payload)){if(t->IntersectsSphere(p,r,n,o->transform.Matrix()))return true;}}return false;}
+void SceneManager::DrawCollisionMeshes(const Shader&s,const Camera&c,int w,int h,bool primitives,bool terrain){s.Use();s.SetMat4("view",c.GetViewMatrix());s.SetMat4("projection",c.GetProjectionMatrix(w,h));glPolygonMode(GL_FRONT_AND_BACK,GL_LINE);for(auto&o:sceneObjects){s.SetMat4("model",o->transform.Matrix());if(primitives)if(auto*m=Mesh(o->payload))m->drawWireframe();if(terrain)if(auto*t=std::get_if<Terrain>(&o->payload))t->DrawWireframe();}glPolygonMode(GL_FRONT_AND_BACK,GL_FILL);}

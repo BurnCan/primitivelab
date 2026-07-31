@@ -47,40 +47,48 @@ glm::vec3 ClosestPointOnTriangle(const glm::vec3& point, const glm::vec3& a,
 }
 }
 
-Terrain::Terrain(int width, int depth, float scale)
+Terrain::Terrain(const TerrainConfig& value) : config(value)
 {
     VAO = VBO = EBO = 0;
     textureID = 0;
     indexCount = 0;
 
-    GenerateMesh(width, depth, scale);
+    GenerateMesh();
+}
+Terrain::Terrain(int width, int depth, float scale) : Terrain(TerrainConfig{TerrainGeometryType::Flat, TerrainPlane::XZ, width, depth, width * scale, depth * scale, 1.0f, {}}) {}
+Terrain::~Terrain() {
+    if (textureID) glDeleteTextures(1, &textureID);
+    if (EBO) glDeleteBuffers(1, &EBO);
+    if (VBO) glDeleteBuffers(1, &VBO);
+    if (VAO) glDeleteVertexArrays(1, &VAO);
 }
 
-void Terrain::GenerateMesh(int width, int depth, float scale)
+void Terrain::GenerateMesh()
 {
+    const int width = config.widthSegments, depth = config.depthSegments;
     std::vector<float> vertices;
     std::vector<unsigned int> indices;
     collisionVertices.clear();
     collisionIndices.clear();
 
-    float halfW = width * 0.5f;
-    float halfD = depth * 0.5f;
+    float halfW = config.width * 0.5f;
+    float halfD = config.depth * 0.5f;
 
     // Create a grid of quads (unit squares)
     for (int z = 0; z <= depth; ++z) {
         for (int x = 0; x <= width; ++x) {
             // positions
-            float xpos = (x - halfW) * scale;
-            float zpos = (z - halfD) * scale;
-            vertices.push_back(xpos);
-            vertices.push_back(0.0f); // flat plane
-            vertices.push_back(zpos);
-            collisionVertices.emplace_back(xpos, 0.0f, zpos);
+            float u = (float(x) / width - 0.5f) * config.width;
+            float v = (float(z) / depth - 0.5f) * config.depth;
+            glm::vec3 p, normal;
+            if (config.plane == TerrainPlane::XY) { p={u,v,0}; normal={0,0,1}; }
+            else if (config.plane == TerrainPlane::YZ) { p={0,u,v}; normal={1,0,0}; }
+            else { p={u,0,v}; normal={0,1,0}; }
+            vertices.insert(vertices.end(), {p.x,p.y,p.z});
+            collisionVertices.push_back(p);
 
             // normals (up)
-            vertices.push_back(0.0f);
-            vertices.push_back(1.0f);
-            vertices.push_back(0.0f);
+            vertices.insert(vertices.end(), {normal.x,normal.y,normal.z});
 
             // texcoords (repeat per unit square)
             vertices.push_back((float)x); // we’ll use integer coords for tiling
@@ -139,7 +147,7 @@ void Terrain::DrawWireframe() const
 }
 
 bool Terrain::IntersectsSphere(const glm::vec3& center, float radius,
-                               glm::vec3* contactNormal) const
+                               glm::vec3* contactNormal, const glm::mat4& model) const
 {
     const float radiusSquared = radius * radius;
     float closestDistanceSquared = std::numeric_limits<float>::max();
@@ -147,9 +155,9 @@ bool Terrain::IntersectsSphere(const glm::vec3& center, float radius,
     bool intersects = false;
 
     for (size_t i = 0; i + 2 < collisionIndices.size(); i += 3) {
-        const glm::vec3& a = collisionVertices[collisionIndices[i]];
-        const glm::vec3& b = collisionVertices[collisionIndices[i + 1]];
-        const glm::vec3& c = collisionVertices[collisionIndices[i + 2]];
+        const glm::vec3 a = glm::vec3(model * glm::vec4(collisionVertices[collisionIndices[i]], 1.0f));
+        const glm::vec3 b = glm::vec3(model * glm::vec4(collisionVertices[collisionIndices[i + 1]], 1.0f));
+        const glm::vec3 c = glm::vec3(model * glm::vec4(collisionVertices[collisionIndices[i + 2]], 1.0f));
         const glm::vec3 closest = ClosestPointOnTriangle(center, a, b, c);
         const glm::vec3 separation = center - closest;
         const float distanceSquared = glm::dot(separation, separation);

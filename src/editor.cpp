@@ -8,6 +8,9 @@
 #include <sstream>
 #include <string>
 #include <memory>
+#include <algorithm>
+#include <cstdio>
+#include <type_traits>
 
 #include "Camera.h"
 #include "SceneManager.h"
@@ -132,18 +135,10 @@ if (sceneManager.loadScene(defaultScenePath)) {
 } else {
     std::cout << "No scene found, creating default one...\n";
 
-    auto cube   = std::make_unique<Primitive3D>(Primitive3DType::Cube, "textures/brick.jpg");
-    auto prism  = std::make_unique<Primitive3D>(Primitive3DType::TriangularPrism, "textures/wood.jpg");
-    auto sphere = std::make_unique<Primitive3D>(Primitive3DType::Sphere, "textures/earth.jpg", 16, 16);
-
-    sceneManager.AddSceneObject(std::move(cube));
-    sceneManager.AddSceneObject(std::move(prism));
-    sceneManager.AddSceneObject(std::move(sphere));
-
-    Light light;
-    light.position = glm::vec3(-2.0f,1.0f,-2.0f);
-    light.color    = glm::vec3(1.0f);
-    sceneManager.AddLight(light);
+    sceneManager.AddPrimitive3D(Primitive3DType::Cube, "textures/brick.jpg");
+    sceneManager.AddPrimitive3D(Primitive3DType::TriangularPrism, "textures/wood.jpg");
+    sceneManager.AddPrimitive3D(Primitive3DType::Sphere, "textures/earth.jpg", 16, 16);
+    sceneManager.AddLight().transform.position = {-2.0f, 1.0f, -2.0f};
 
     // Track it even if just created
     currentSceneFile = defaultScenePath;
@@ -409,7 +404,7 @@ if (sceneFocused) {
                        SCR_HEIGHT);
 
         // Draw light spheres
-        sceneManager.drawLights(lightShader,
+        sceneManager.DrawLightGizmos(lightShader,
                        useFPSCamera ? fpsCamera : editorCamera,
                        SCR_WIDTH,
                        SCR_HEIGHT);
@@ -428,117 +423,32 @@ if (sceneFocused) {
         ImGui::Image((void*)(intptr_t)sceneTexture, viewportSize, ImVec2(0,1), ImVec2(1,0));
         ImGui::End();
 
-        // ---------------- Light Editor ----------------
-        ImGui::Begin("Light Editor");
-
-        ImVec4 titleColor = (focusedWindowIndex == 1) ? ImVec4(0.9f,0.7f,0.2f,1.0f) : ImVec4(1,1,1,1);
-        ImGui::PushStyleColor(ImGuiCol_Text, titleColor);
-        ImGui::Text("Light Editor Controls");
-        ImGui::PopStyleColor();
-
-        // Iterate over lights in the scene manager
-        auto& lights = sceneManager.GetLights();
-        for (size_t i = 0; i < lights.size(); ++i) {
-            Light& light = lights[i];
-
-            ImGui::Separator();
-            ImGui::Text("Light %d", (int)i);
-
-            // Position slider
-            ImGui::SliderFloat3(("Position##" + std::to_string(i)).c_str(), &light.position[0], -10.0f, 10.0f);
-
-            // Color editor
-            ImGui::ColorEdit3(("Color##" + std::to_string(i)).c_str(), &light.color[0]);
-
-            // Optional per-light shininess slider
-            // ImGui::SliderFloat(("Shininess##" + std::to_string(i)).c_str(), &light.shininess, 1.0f, 128.0f);
-        }
-
-        // Button to add a new light
-        if (ImGui::Button("Add Light")) {
-            Light newLight;
-            newLight.position = glm::vec3(0.0f, 1.0f, 0.0f);
-            newLight.color    = glm::vec3(1.0f);
-            sceneManager.AddLight(newLight);
-        }
-
-        // Button to remove the last light
-        if (ImGui::Button("Remove Last Light") && !sceneManager.GetLights().empty()) {
-            sceneManager.GetLights().pop_back();
-        }
-
-        ImGui::End();
-
-// === Scene Object Editor Window ===
+        // Lights and payloads are edited together: each entity appears once.
 ImGui::Begin("Scene Objects");
-
 const std::filesystem::path textureDirectory = ResolveAssetPath("textures", "textures");
 std::vector<std::string> textureFiles = GetAvailableTextures(textureDirectory.string());
-static int newPrimitiveTextureIndex = 0;
-const bool hasTextures = !textureFiles.empty();
-if (hasTextures && newPrimitiveTextureIndex >= static_cast<int>(textureFiles.size())) newPrimitiveTextureIndex = 0;
-const char* texturePreview = hasTextures ? textureFiles[newPrimitiveTextureIndex].c_str() : "No textures found";
-if (ImGui::BeginCombo("Texture##NewSceneObject", texturePreview)) {
-    for (int i = 0; i < static_cast<int>(textureFiles.size()); ++i) {
-        const bool selected = newPrimitiveTextureIndex == i;
-        if (ImGui::Selectable(textureFiles[i].c_str(), selected)) newPrimitiveTextureIndex = i;
-        if (selected) ImGui::SetItemDefaultFocus();
-    }
-    ImGui::EndCombo();
-}
-const std::string creationTexture = hasTextures ? textureFiles[newPrimitiveTextureIndex] : std::string{};
-if (!hasTextures) ImGui::BeginDisabled();
-ImGui::Text("Add 2D Primitive");
-if (ImGui::Button("Triangle")) sceneManager.AddSceneObject(std::make_unique<Primitive2D>(Primitive2DType::Triangle, creationTexture));
-ImGui::SameLine();
-if (ImGui::Button("Plane")) sceneManager.AddSceneObject(std::make_unique<Primitive2D>(Primitive2DType::Plane, creationTexture));
-ImGui::Text("Add 3D Primitive");
-if (ImGui::Button("Cube")) sceneManager.AddSceneObject(std::make_unique<Primitive3D>(Primitive3DType::Cube, creationTexture));
-ImGui::SameLine();
-if (ImGui::Button("Triangular Prism")) sceneManager.AddSceneObject(std::make_unique<Primitive3D>(Primitive3DType::TriangularPrism, creationTexture));
-ImGui::SameLine();
-if (ImGui::Button("Sphere")) sceneManager.AddSceneObject(std::make_unique<Primitive3D>(Primitive3DType::Sphere, creationTexture));
-ImGui::SameLine();
-if (ImGui::Button("Slab")) sceneManager.AddSceneObject(std::make_unique<Primitive3D>(Primitive3DType::Slab, creationTexture));
-if (!hasTextures) ImGui::EndDisabled();
-ImGui::Separator();
-
-const auto& sceneObjects = sceneManager.GetSceneObjects();
-int objectToDelete = -1;
-for (int i = 0; i < static_cast<int>(sceneObjects.size()); ++i) {
-    SceneObject* object = sceneObjects[i].get();
-    auto* prim = dynamic_cast<detail::PrimitiveMesh*>(object);
-    if (!object || !prim) continue;
-    const char* category = dynamic_cast<Primitive2D*>(object) ? "2D Primitive" : "3D Primitive";
-    ImGui::PushID(i);
-    const std::string heading = object->GetName() + " — " + category + "##" + std::to_string(i);
-    if (ImGui::CollapsingHeader(heading.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
-        ImGui::Columns(2, ("SceneObjectColumns##" + std::to_string(i)).c_str(), false);
-        ImGui::Text("Transform (3D world placement)");
-        if (ImGui::SliderFloat3("Position", &prim->position[0], -10.0f, 10.0f)) prim->UpdateModelMatrix();
-        if (ImGui::SliderFloat3("Rotation", &prim->rotation[0], -180.0f, 180.0f)) prim->UpdateModelMatrix();
-        if (ImGui::SliderFloat3("Scale", &prim->scale[0], 0.1f, 5.0f)) prim->UpdateModelMatrix();
-        ImGui::NextColumn();
-        ImGui::Text("Texture");
-        const std::string currentTex = prim->GetTexturePath().empty() ? "(none)" : prim->GetTexturePath();
-        if (ImGui::BeginCombo("Select Texture", currentTex.c_str())) {
-            for (const auto& tex : textureFiles) {
-                const bool selected = tex == prim->GetTexturePath();
-                if (ImGui::Selectable(tex.c_str(), selected)) prim->SetTexturePath((std::filesystem::path("textures") / tex).generic_string());
-                if (selected) ImGui::SetItemDefaultFocus();
-            }
-            ImGui::EndCombo();
-        }
-        ImGui::Image((void*)(intptr_t)prim->GetTextureID(), ImVec2(64, 64), ImVec2(0,1), ImVec2(1,0));
-        if (ImGui::Button("Delete")) objectToDelete = i;
-        ImGui::Columns(1);
-        ImGui::Separator();
-    }
-    ImGui::PopID();
-}
-if (objectToDelete >= 0) sceneManager.RemoveSceneObject(static_cast<std::size_t>(objectToDelete));
+static int textureIndex = 0;
+if (!textureFiles.empty()) textureIndex = std::min(textureIndex, int(textureFiles.size()-1));
+const std::string creationTexture = textureFiles.empty() ? std::string{} : textureFiles[textureIndex];
+if (ImGui::Button("Add Cube")) sceneManager.AddPrimitive3D(Primitive3DType::Cube, creationTexture);
+ImGui::SameLine(); if (ImGui::Button("Add Plane")) sceneManager.AddPrimitive2D(Primitive2DType::Plane, creationTexture);
+ImGui::SameLine(); if (ImGui::Button("Add Terrain")) { auto& o=sceneManager.AddTerrain(); std::get<Terrain>(o.payload).SetTexturePath(creationTexture); }
+ImGui::SameLine(); if (ImGui::Button("Add Light Only")) sceneManager.AddLight();
+auto& objects=sceneManager.GetSceneObjects(); int objectToDelete=-1;
+for(int i=0;i<int(objects.size());++i){auto& o=*objects[i];ImGui::PushID(i);
+ if(ImGui::CollapsingHeader(o.name.c_str())){char name[128];std::snprintf(name,sizeof(name),"%s",o.name.c_str());if(ImGui::InputText("Name",name,sizeof(name)))o.name=name;
+  ImGui::Checkbox("Enabled",&o.enabled);ImGui::SameLine();ImGui::Checkbox("Visible",&o.visible);
+  ImGui::DragFloat3("Position",&o.transform.position.x,.05f);ImGui::DragFloat3("Rotation",&o.transform.rotation.x,.5f);ImGui::DragFloat3("Scale",&o.transform.scale.x,.05f,.01f,100.f);
+  std::visit([&](auto& payload){using T=std::decay_t<decltype(payload)>;
+   if constexpr(std::is_same_v<T,Primitive2D>||std::is_same_v<T,Primitive3D>){ImGui::Text("Primitive: %s",payload.GetTypeName().c_str());ImGui::Text("Texture: %s",payload.GetTexturePath().c_str());}
+   else if constexpr(std::is_same_v<T,Terrain>){auto& c=payload.GetConfig();ImGui::Text("Terrain: %s / %s",c.geometryType==TerrainGeometryType::Flat?"Flat":"Heightmap",c.plane==TerrainPlane::XY?"XY":c.plane==TerrainPlane::YZ?"YZ":"XZ");ImGui::Text("%d x %d segments, %.1f x %.1f",c.widthSegments,c.depthSegments,c.width,c.depth);ImGui::Text("Texture: %s",payload.GetTexturePath().c_str());}
+   else ImGui::TextUnformatted("No renderable payload");},o.payload);
+  if(o.light){int type=int(o.light->type);const char* types[]={"Point","Directional","Spot"};ImGui::Combo("Light Type",&type,types,3);o.light->type=LightType(type);ImGui::ColorEdit3("Light Color",&o.light->color.x);ImGui::DragFloat("Intensity",&o.light->intensity,.05f,0);ImGui::DragFloat("Range",&o.light->range,.1f,0);ImGui::DragFloat("Inner Cone",&o.light->innerConeAngle,.5f,0,180);ImGui::DragFloat("Outer Cone",&o.light->outerConeAngle,.5f,0,180);if(ImGui::Button("Remove Light Component"))o.light.reset();}
+  else if(ImGui::Button("Add Light Component"))o.light.emplace();
+  if(ImGui::Button("Delete Object"))objectToDelete=i;
+ }ImGui::PopID();}
+if(objectToDelete>=0)sceneManager.RemoveSceneObject(objectToDelete);
 ImGui::End();
-
 
 // ---------------- Debug Window ----------------
 
