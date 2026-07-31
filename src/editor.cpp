@@ -444,7 +444,8 @@ if (!sceneManager.GetSkybox()) {
 }
 auto& objects=sceneManager.GetSceneObjects(); int objectToDelete=-1;
 for(int i=0;i<int(objects.size());++i){auto& o=*objects[i];ImGui::PushID(i);
- if(ImGui::CollapsingHeader(o.name.c_str())){char name[128];std::snprintf(name,sizeof(name),"%s",o.name.c_str());if(ImGui::InputText("Name",name,sizeof(name)))o.name=name;
+ const std::string objectHeaderLabel=o.name+"###ObjectHeader";
+ if(ImGui::CollapsingHeader(objectHeaderLabel.c_str())){char name[128];std::snprintf(name,sizeof(name),"%s",o.name.c_str());if(ImGui::InputText("Name",name,sizeof(name)))o.name=name;
   ImGui::Checkbox("Enabled",&o.enabled);ImGui::SameLine();ImGui::Checkbox("Visible",&o.visible);
   const bool isSkybox=std::holds_alternative<Skybox>(o.payload);
   if(!isSkybox)ImGui::DragFloat3("Position",&o.transform.position.x,.05f);ImGui::DragFloat3("Rotation",&o.transform.rotation.x,.5f);if(!isSkybox)ImGui::DragFloat3("Scale",&o.transform.scale.x,.05f,.01f,100.f);
