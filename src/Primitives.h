@@ -4,7 +4,6 @@
 #include <vector>
 #include <glm/glm.hpp> // For modelMatrix
 #include <glm/gtc/matrix_transform.hpp>
-#include "SceneObject.h"
 
 
 // ---- How to Add a New Primitive ----
@@ -40,6 +39,8 @@ enum class PrimitiveMeshType {
 
 class PrimitiveMesh {
 public:
+    PrimitiveMesh(const PrimitiveMesh&) = delete;
+    PrimitiveMesh& operator=(const PrimitiveMesh&) = delete;
     // Public getters
     GLuint GetTextureID() const { return textureID; }
     const std::string& GetTexturePath() const { return texturePath; }
@@ -61,11 +62,6 @@ public:
     // Public model matrix for rendering
     glm::mat4 modelMatrix = glm::mat4(1.0f);
 
-    // New: transform components (editable in ImGui)
-    glm::vec3 position {0.0f, 0.0f, 0.0f};
-    glm::vec3 rotation {0.0f, 0.0f, 0.0f}; // Euler angles (degrees)
-    glm::vec3 scale    {1.0f, 1.0f, 1.0f};
-
     // Constructors
     PrimitiveMesh(PrimitiveMeshType type, const std::string& texturePath);
     PrimitiveMesh(PrimitiveMeshType type, const std::string& texturePath,
@@ -80,19 +76,6 @@ public:
     // surface point toward the sphere center.
     bool IntersectsSphere(const glm::vec3& center, float radius,
                           glm::vec3* contactNormal = nullptr) const;
-
-    // New: update model matrix from transform components
-    void UpdateModelMatrix() {
-        modelMatrix = glm::mat4(1.0f);
-        modelMatrix = glm::translate(modelMatrix, position);
-        modelMatrix = glm::rotate(modelMatrix, glm::radians(rotation.z), glm::vec3(0, 0, 1));
-
-        modelMatrix = glm::rotate(modelMatrix, glm::radians(rotation.y), glm::vec3(0, 1, 0));
-        modelMatrix = glm::rotate(modelMatrix, glm::radians(rotation.x), glm::vec3(1, 0, 0));
-
-        modelMatrix = glm::scale(modelMatrix, scale);
-
-    }
 
     // Texture management
     void SetTexturePath(const std::string& newPath);
@@ -133,14 +116,13 @@ private:
 
 enum class Primitive2DType { Triangle, Plane };
 
-class Primitive2D final : public SceneObject, public detail::PrimitiveMesh {
+class Primitive2D final : public detail::PrimitiveMesh {
 public:
     Primitive2D(Primitive2DType type, const std::string& texturePath)
         : PrimitiveMesh(type == Primitive2DType::Triangle
                             ? detail::PrimitiveMeshType::Triangle
                             : detail::PrimitiveMeshType::Plane,
                         texturePath) {}
-    std::string GetName() const final { return GetTypeName(); }
     Primitive2DType GetPrimitiveType() const {
         return GetType() == detail::PrimitiveMeshType::Triangle
             ? Primitive2DType::Triangle : Primitive2DType::Plane;
@@ -149,12 +131,11 @@ public:
 
 enum class Primitive3DType { Cube, TriangularPrism, Sphere, Slab };
 
-class Primitive3D final : public SceneObject, public detail::PrimitiveMesh {
+class Primitive3D final : public detail::PrimitiveMesh {
 public:
     Primitive3D(Primitive3DType type, const std::string& texturePath,
               unsigned int xSegments = 32, unsigned int ySegments = 32)
         : PrimitiveMesh(ToMeshType(type), texturePath, xSegments, ySegments) {}
-    std::string GetName() const final { return GetTypeName(); }
     Primitive3DType GetPrimitiveType() const;
 
 private:
