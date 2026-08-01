@@ -6,13 +6,14 @@
 #include "Camera.h"
 #include "SceneObject.h"
 #include "ShaderUtils.h"
+#include "MaterialRegistry.h"
 
 class SceneManager {
 public:
     SceneManager();
     bool loadScene(const std::string& filepath);
     bool saveScene(const std::string& filepath);
-    void drawScene(const Shader&, const Shader&, Camera&, int, int);
+    void drawScene(const Shader&, const Shader&, const MaterialRegistry&, Camera&, int, int);
     void DrawLightGizmos(const Shader&, Camera&, int, int);
     bool CheckCollision(const glm::vec3&, float radius = FPS_CAMERA_COLLISION_RADIUS, glm::vec3* = nullptr);
     void DrawDebugWindow();

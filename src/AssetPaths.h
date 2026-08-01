@@ -20,9 +20,9 @@ inline std::filesystem::path ResolveAssetPath(const std::string& path,
         requested,
         cwd / requested,
         cwd.parent_path() / requested,
-        cwd / assetDirectory / requested.filename(),
-        cwd.parent_path() / assetDirectory / requested.filename(),
-        fs::path(PRIMITIVELAB_ASSET_ROOT) / assetDirectory / requested.filename()
+        cwd / assetDirectory / requested,
+        cwd.parent_path() / assetDirectory / requested,
+        fs::path(PRIMITIVELAB_ASSET_ROOT) / assetDirectory / requested
     };
 
     for (const auto& candidate : candidates) {
@@ -32,5 +32,5 @@ inline std::filesystem::path ResolveAssetPath(const std::string& path,
     }
 
     // Return the canonical expected location to make error messages useful.
-    return fs::path(PRIMITIVELAB_ASSET_ROOT) / assetDirectory / requested.filename();
+    return fs::path(PRIMITIVELAB_ASSET_ROOT) / assetDirectory / requested;
 }
