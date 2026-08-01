@@ -8,9 +8,11 @@
 #include <sstream>
 #include <string>
 #include <memory>
+#include <optional>
 #include <algorithm>
 #include <cstdio>
 #include <type_traits>
+#include <vector>
 
 #include "Camera.h"
 #include "SceneManager.h"
@@ -433,6 +435,12 @@ ImGui::Begin("Scene Objects");
 const std::filesystem::path textureDirectory = ResolveAssetPath("textures", "textures");
 std::vector<std::string> textureFiles = GetAvailableTextures(textureDirectory.string());
 static int textureIndex = 0;
+static int sceneObjectSortMode = 0;
+const char* sceneObjectSortModes[] = {"Newest to Oldest", "Oldest to Newest"};
+ImGui::TextUnformatted("Sort");
+ImGui::SameLine();
+ImGui::SetNextItemWidth(220.0f);
+ImGui::Combo("##SceneObjectSort", &sceneObjectSortMode, sceneObjectSortModes, 2);
 if (!textureFiles.empty()) textureIndex = std::min(textureIndex, int(textureFiles.size()-1));
 const std::string creationTexture = textureFiles.empty() ? std::string{} : textureFiles[textureIndex];
 if (ImGui::Button("Add Cube")) sceneManager.AddPrimitive3D(Primitive3DType::Cube, creationTexture);
@@ -442,8 +450,13 @@ ImGui::SameLine(); if (ImGui::Button("Add Light Only")) sceneManager.AddLight();
 if (!sceneManager.GetSkybox()) {
  ImGui::SameLine(); if (ImGui::Button("Add Skybox")) sceneManager.AddSkybox();
 }
-auto& objects=sceneManager.GetSceneObjects(); int objectToDelete=-1;
-for(int i=0;i<int(objects.size());++i){auto& o=*objects[i];ImGui::PushID(i);
+auto& objects=sceneManager.GetSceneObjects();
+std::vector<std::size_t> displayOrder;
+displayOrder.reserve(objects.size());
+for(std::size_t index=0;index<objects.size();++index)displayOrder.push_back(index);
+if(sceneObjectSortMode==0)std::reverse(displayOrder.begin(),displayOrder.end());
+std::optional<std::size_t> objectToDelete;
+for(std::size_t sourceIndex:displayOrder){auto& o=*objects[sourceIndex];ImGui::PushID(static_cast<int>(sourceIndex));
  const std::string objectHeaderLabel=o.name+"###ObjectHeader";
  if(ImGui::CollapsingHeader(objectHeaderLabel.c_str())){char name[128];std::snprintf(name,sizeof(name),"%s",o.name.c_str());if(ImGui::InputText("Name",name,sizeof(name)))o.name=name;
   ImGui::Checkbox("Enabled",&o.enabled);ImGui::SameLine();ImGui::Checkbox("Visible",&o.visible);
@@ -461,9 +474,9 @@ for(int i=0;i<int(objects.size());++i){auto& o=*objects[i];ImGui::PushID(i);
    else ImGui::TextUnformatted("No renderable payload");},o.payload);
   if(!isSkybox&&o.light){int type=int(o.light->type);const char* types[]={"Point","Directional","Spot"};ImGui::Combo("Light Type",&type,types,3);o.light->type=LightType(type);ImGui::ColorEdit3("Light Color",&o.light->color.x);ImGui::DragFloat("Intensity",&o.light->intensity,.05f,0);ImGui::DragFloat("Range",&o.light->range,.1f,0);ImGui::DragFloat("Inner Cone",&o.light->innerConeAngle,.5f,0,180);ImGui::DragFloat("Outer Cone",&o.light->outerConeAngle,.5f,0,180);if(ImGui::Button("Remove Light Component"))o.light.reset();}
   else if(!isSkybox&&!o.light&&ImGui::Button("Add Light Component"))o.light.emplace();
-  if(ImGui::Button("Delete Object"))objectToDelete=i;
+  if(ImGui::Button("Delete Object"))objectToDelete=sourceIndex;
  }ImGui::PopID();}
-if(objectToDelete>=0){if(std::holds_alternative<Skybox>(objects[objectToDelete]->payload))pendingSkybox=nullptr;sceneManager.RemoveSceneObject(objectToDelete);}
+if(objectToDelete){if(std::holds_alternative<Skybox>(objects[*objectToDelete]->payload))pendingSkybox=nullptr;sceneManager.RemoveSceneObject(*objectToDelete);}
 ImGui::End();
 
 // ---------------- Debug Window ----------------
