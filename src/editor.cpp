@@ -86,6 +86,27 @@ static bool SceneObjectTypeGroup(const char* label, const SceneObjectTypeOption*
     return selectionChanged;
 }
 
+template <typename SetTexture>
+static void TextureSelector(const std::vector<std::string>& textureFiles,
+                            const std::string& currentTexture, SetTexture&& setTexture) {
+    const std::string currentFilename = std::filesystem::path(currentTexture).filename().string();
+    const char* preview = currentFilename.empty() ? "No texture" : currentFilename.c_str();
+
+    ImGui::SetNextItemWidth(-1.0f);
+    if (ImGui::BeginCombo("Texture", preview)) {
+        if (textureFiles.empty()) {
+            ImGui::TextDisabled("No textures found");
+        } else {
+            for (const std::string& texture : textureFiles) {
+                const bool selected = texture == currentFilename;
+                if (ImGui::Selectable(texture.c_str(), selected)) setTexture(texture);
+                if (selected) ImGui::SetItemDefaultFocus();
+            }
+        }
+        ImGui::EndCombo();
+    }
+}
+
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
     SCR_WIDTH = width;
     SCR_HEIGHT = height;
@@ -555,8 +576,8 @@ for(std::size_t sourceIndex:displayOrder){auto& o=*objects[sourceIndex];ImGui::P
   const bool isSkybox=std::holds_alternative<Skybox>(o.payload);
   if(!isSkybox)ImGui::DragFloat3("Position",&o.transform.position.x,.05f);ImGui::DragFloat3("Rotation",&o.transform.rotation.x,.5f);if(!isSkybox)ImGui::DragFloat3("Scale",&o.transform.scale.x,.05f,.01f,100.f);
   std::visit([&](auto& payload){using T=std::decay_t<decltype(payload)>;
-   if constexpr(std::is_same_v<T,Primitive2D>||std::is_same_v<T,Primitive3D>){ImGui::Text("Primitive: %s",payload.GetTypeName().c_str());ImGui::Text("Texture: %s",payload.GetTexturePath().c_str());}
-   else if constexpr(std::is_same_v<T,Terrain>){auto& c=payload.GetConfig();ImGui::Text("Terrain: %s / %s",c.geometryType==TerrainGeometryType::Flat?"Flat":"Heightmap",c.plane==TerrainPlane::XY?"XY":c.plane==TerrainPlane::YZ?"YZ":"XZ");ImGui::Text("%d x %d segments, %.1f x %.1f",c.widthSegments,c.depthSegments,c.width,c.depth);ImGui::Text("Texture: %s",payload.GetTexturePath().c_str());}
+   if constexpr(std::is_same_v<T,Primitive2D>||std::is_same_v<T,Primitive3D>){ImGui::Text("Primitive: %s",payload.GetTypeName().c_str());TextureSelector(textureFiles,payload.GetTexturePath(),[&](const std::string& texture){payload.SetTexturePath(texture);});}
+   else if constexpr(std::is_same_v<T,Terrain>){auto& c=payload.GetConfig();ImGui::Text("Terrain: %s / %s",c.geometryType==TerrainGeometryType::Flat?"Flat":"Heightmap",c.plane==TerrainPlane::XY?"XY":c.plane==TerrainPlane::YZ?"YZ":"XZ");ImGui::Text("%d x %d segments, %.1f x %.1f",c.widthSegments,c.depthSegments,c.width,c.depth);TextureSelector(textureFiles,payload.GetTexturePath(),[&](const std::string& texture){payload.SetTexturePath(texture);});}
    else if constexpr(std::is_same_v<T,Skybox>){
     if(pendingSkybox!=&payload){pendingSkybox=&payload;auto&c=payload.GetConfig();const std::string* values[]={&c.right,&c.left,&c.top,&c.bottom,&c.front,&c.back};for(int n=0;n<6;++n)std::snprintf(pendingSkyboxPaths[n],sizeof(pendingSkyboxPaths[n]),"%s",values[n]->c_str());}
     const char* labels[]={"Right (+X)","Left (-X)","Top (+Y)","Bottom (-Y)","Front (+Z)","Back (-Z)"};for(int n=0;n<6;++n)ImGui::InputText(labels[n],pendingSkyboxPaths[n],sizeof(pendingSkyboxPaths[n]));
