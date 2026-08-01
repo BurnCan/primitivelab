@@ -86,6 +86,28 @@ static bool SceneObjectTypeGroup(const char* label, const SceneObjectTypeOption*
     return selectionChanged;
 }
 
+static bool DragVector3(const char* label, float* values, float speed,
+                        float minimum = 0.0f, float maximum = 0.0f) {
+    ImGui::TextUnformatted(label);
+    ImGui::PushID(label);
+    bool changed = false;
+    if (ImGui::BeginTable("##Components", 3, ImGuiTableFlags_SizingStretchSame)) {
+        static const char* componentLabels[] = {"X", "Y", "Z"};
+        for (int component = 0; component < 3; ++component) {
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted(componentLabels[component]);
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(-1.0f);
+            ImGui::PushID(component);
+            changed |= ImGui::DragFloat("##Value", &values[component], speed, minimum, maximum);
+            ImGui::PopID();
+        }
+        ImGui::EndTable();
+    }
+    ImGui::PopID();
+    return changed;
+}
+
 template <typename SetTexture>
 static void TextureSelector(const std::vector<std::string>& textureFiles,
                             const std::string& currentTexture, SetTexture&& setTexture) {
@@ -559,8 +581,9 @@ if (skyboxAlreadyExists && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisab
 ImGui::Spacing();
 ImGui::Separator();
 ImGui::TextUnformatted("Object List:");
+ImGui::TextUnformatted("Sort");
 ImGui::SetNextItemWidth(-1.0f);
-ImGui::Combo("Sort##SceneObjectSort", &sceneObjectSortMode, sceneObjectSortModes, 2);
+ImGui::Combo("##SceneObjectSort", &sceneObjectSortMode, sceneObjectSortModes, 2);
 
 auto& objects=sceneManager.GetSceneObjects();
 std::vector<std::size_t> displayOrder;
@@ -573,7 +596,7 @@ for(std::size_t sourceIndex:displayOrder){auto& o=*objects[sourceIndex];ImGui::P
  const bool isSkybox=std::holds_alternative<Skybox>(o.payload);
  const bool renderable=!std::holds_alternative<std::monostate>(o.payload);
  const bool objectExpanded=ImGui::CollapsingHeader(objectHeaderLabel.c_str());
- if(objectExpanded){char name[128];std::snprintf(name,sizeof(name),"%s",o.name.c_str());if(ImGui::InputText("Name",name,sizeof(name)))o.name=name;
+ if(objectExpanded){char name[128];std::snprintf(name,sizeof(name),"%s",o.name.c_str());ImGui::TextUnformatted("Name");ImGui::SetNextItemWidth(-1.0f);if(ImGui::InputText("##Name",name,sizeof(name)))o.name=name;
   if(renderable){
    if(ImGui::BeginTable("RenderSettings",2,ImGuiTableFlags_SizingStretchSame)){
     ImGui::TableNextColumn();
@@ -599,14 +622,22 @@ for(std::size_t sourceIndex:displayOrder){auto& o=*objects[sourceIndex];ImGui::P
    else if constexpr(std::is_same_v<T,Skybox>){
     if(o.renderMode==RenderMode::Texture){
     if(pendingSkybox!=&payload){pendingSkybox=&payload;auto&c=payload.GetConfig();const std::string* values[]={&c.right,&c.left,&c.top,&c.bottom,&c.front,&c.back};for(int n=0;n<6;++n)std::snprintf(pendingSkyboxPaths[n],sizeof(pendingSkyboxPaths[n]),"%s",values[n]->c_str());}
-    const char* labels[]={"Right (+X)","Left (-X)","Top (+Y)","Bottom (-Y)","Front (+Z)","Back (-Z)"};for(int n=0;n<6;++n)ImGui::InputText(labels[n],pendingSkyboxPaths[n],sizeof(pendingSkyboxPaths[n]));
+    const char* labels[]={"Right (+X)","Left (-X)","Top (+Y)","Bottom (-Y)","Front (+Z)","Back (-Z)"};for(int n=0;n<6;++n){ImGui::TextUnformatted(labels[n]);ImGui::SetNextItemWidth(-1.0f);ImGui::PushID(n);ImGui::InputText("##CubemapFace",pendingSkyboxPaths[n],sizeof(pendingSkyboxPaths[n]));ImGui::PopID();}
     if(ImGui::Button("Reload Cubemap")){SkyboxConfig c{pendingSkyboxPaths[0],pendingSkyboxPaths[1],pendingSkyboxPaths[2],pendingSkyboxPaths[3],pendingSkyboxPaths[4],pendingSkyboxPaths[5]};if(payload.Reload(c))std::cout<<"[Skybox] Cubemap reloaded\n";}
     if(!payload.GetLastError().empty())ImGui::TextWrapped("Error: %s",payload.GetLastError().c_str());}
    }
    else ImGui::TextUnformatted("No renderable payload");},o.payload);
-  if(!isSkybox)ImGui::DragFloat3("Position",&o.transform.position.x,.05f);ImGui::DragFloat3("Rotation",&o.transform.rotation.x,.5f);if(!isSkybox)ImGui::DragFloat3("Scale",&o.transform.scale.x,.05f,.01f,100.f);
-  ImGui::Checkbox("Enabled",&o.enabled);ImGui::SameLine();ImGui::Checkbox("Visible",&o.visible);
-  if(!isSkybox&&o.light){int type=int(o.light->type);const char* types[]={"Point","Directional","Spot"};ImGui::Combo("Light Type",&type,types,3);o.light->type=LightType(type);ImGui::ColorEdit3("Light Color",&o.light->color.x);ImGui::DragFloat("Intensity",&o.light->intensity,.05f,0);ImGui::DragFloat("Range",&o.light->range,.1f,0);ImGui::DragFloat("Inner Cone",&o.light->innerConeAngle,.5f,0,180);ImGui::DragFloat("Outer Cone",&o.light->outerConeAngle,.5f,0,180);if(ImGui::Button("Remove Light Component"))o.light.reset();}
+  if(!isSkybox)DragVector3("Position",&o.transform.position.x,.05f);DragVector3("Rotation",&o.transform.rotation.x,.5f);if(!isSkybox)DragVector3("Scale",&o.transform.scale.x,.05f,.01f,100.f);
+  ImGui::TextUnformatted("Enabled");ImGui::Checkbox("##Enabled",&o.enabled);
+  ImGui::TextUnformatted("Visible");ImGui::Checkbox("##Visible",&o.visible);
+  if(!isSkybox&&o.light){int type=int(o.light->type);const char* types[]={"Point","Directional","Spot"};
+   ImGui::TextUnformatted("Light Type");ImGui::SetNextItemWidth(-1.0f);ImGui::Combo("##LightType",&type,types,3);o.light->type=LightType(type);
+   ImGui::TextUnformatted("Light Color");ImGui::SetNextItemWidth(-1.0f);ImGui::ColorEdit3("##LightColor",&o.light->color.x);
+   ImGui::TextUnformatted("Intensity");ImGui::SetNextItemWidth(-1.0f);ImGui::DragFloat("##Intensity",&o.light->intensity,.05f,0);
+   ImGui::TextUnformatted("Range");ImGui::SetNextItemWidth(-1.0f);ImGui::DragFloat("##Range",&o.light->range,.1f,0);
+   ImGui::TextUnformatted("Inner Cone");ImGui::SetNextItemWidth(-1.0f);ImGui::DragFloat("##InnerCone",&o.light->innerConeAngle,.5f,0,180);
+   ImGui::TextUnformatted("Outer Cone");ImGui::SetNextItemWidth(-1.0f);ImGui::DragFloat("##OuterCone",&o.light->outerConeAngle,.5f,0,180);
+   if(ImGui::Button("Remove Light Component"))o.light.reset();}
   else if(!isSkybox&&!o.light&&ImGui::Button("Add Light Component"))o.light.emplace();
   if(ImGui::Button("Delete Object"))objectToDelete=sourceIndex;
  }ImGui::PopID();}
