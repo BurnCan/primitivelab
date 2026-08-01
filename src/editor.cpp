@@ -50,6 +50,42 @@ static bool showTerrainMesh = false;
 static Skybox* pendingSkybox = nullptr;
 static char pendingSkyboxPaths[6][512]{};
 
+enum class SceneObjectType {
+    Triangle,
+    Plane,
+    Cube,
+    TriangularPrism,
+    Sphere,
+    Slab,
+    Terrain,
+    Skybox,
+    Light
+};
+
+struct SceneObjectTypeOption {
+    SceneObjectType type;
+    const char* name;
+};
+
+static bool SceneObjectTypeGroup(const char* label, const SceneObjectTypeOption* options,
+                                 int optionCount, SceneObjectType& selectedType) {
+    bool selectionChanged = false;
+    ImGui::TextDisabled("%s", label);
+    ImGui::Indent();
+    for (int index = 0; index < optionCount; ++index) {
+        ImGui::PushID(static_cast<int>(options[index].type));
+        const bool isSelected = selectedType == options[index].type;
+        if (ImGui::Selectable(options[index].name, isSelected, 0, ImVec2(0.0f, 0.0f))) {
+            selectedType = options[index].type;
+            selectionChanged = true;
+        }
+        if (isSelected) ImGui::SetItemDefaultFocus();
+        ImGui::PopID();
+    }
+    ImGui::Unindent();
+    return selectionChanged;
+}
+
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
     SCR_WIDTH = width;
     SCR_HEIGHT = height;
@@ -443,13 +479,69 @@ ImGui::SetNextItemWidth(220.0f);
 ImGui::Combo("##SceneObjectSort", &sceneObjectSortMode, sceneObjectSortModes, 2);
 if (!textureFiles.empty()) textureIndex = std::min(textureIndex, int(textureFiles.size()-1));
 const std::string creationTexture = textureFiles.empty() ? std::string{} : textureFiles[textureIndex];
-if (ImGui::Button("Add Cube")) sceneManager.AddPrimitive3D(Primitive3DType::Cube, creationTexture);
-ImGui::SameLine(); if (ImGui::Button("Add Plane")) sceneManager.AddPrimitive2D(Primitive2DType::Plane, creationTexture);
-ImGui::SameLine(); if (ImGui::Button("Add Terrain")) { auto& o=sceneManager.AddTerrain(); std::get<Terrain>(o.payload).SetTexturePath(creationTexture); }
-ImGui::SameLine(); if (ImGui::Button("Add Light Only")) sceneManager.AddLight();
-if (!sceneManager.GetSkybox()) {
- ImGui::SameLine(); if (ImGui::Button("Add Skybox")) sceneManager.AddSkybox();
+static SceneObjectType selectedSceneObjectType = SceneObjectType::Cube;
+static const SceneObjectTypeOption primitive2DTypes[] = {
+    {SceneObjectType::Triangle, "Triangle"},
+    {SceneObjectType::Plane, "Plane"}
+};
+static const SceneObjectTypeOption primitive3DTypes[] = {
+    {SceneObjectType::Cube, "Cube"},
+    {SceneObjectType::TriangularPrism, "Triangular Prism"},
+    {SceneObjectType::Sphere, "Sphere"},
+    {SceneObjectType::Slab, "Slab"}
+};
+static const SceneObjectTypeOption environmentTypes[] = {
+    {SceneObjectType::Terrain, "Terrain"},
+    {SceneObjectType::Skybox, "Skybox"}
+};
+static const SceneObjectTypeOption lightingTypes[] = {
+    {SceneObjectType::Light, "Light"}
+};
+const char* selectedSceneObjectName = "Cube";
+for (const SceneObjectTypeOption& option : primitive2DTypes)
+    if (option.type == selectedSceneObjectType) selectedSceneObjectName = option.name;
+for (const SceneObjectTypeOption& option : primitive3DTypes)
+    if (option.type == selectedSceneObjectType) selectedSceneObjectName = option.name;
+for (const SceneObjectTypeOption& option : environmentTypes)
+    if (option.type == selectedSceneObjectType) selectedSceneObjectName = option.name;
+for (const SceneObjectTypeOption& option : lightingTypes)
+    if (option.type == selectedSceneObjectType) selectedSceneObjectName = option.name;
+
+const float addButtonWidth = ImGui::CalcTextSize("Add").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+ImGui::SetNextItemWidth(std::max(120.0f, ImGui::GetContentRegionAvail().x - addButtonWidth - ImGui::GetStyle().ItemSpacing.x));
+if (ImGui::BeginCombo("##SceneObjectType", selectedSceneObjectName)) {
+    SceneObjectTypeGroup("Primitives 2D", primitive2DTypes, 2, selectedSceneObjectType);
+    ImGui::Separator();
+    SceneObjectTypeGroup("Primitives 3D", primitive3DTypes, 4, selectedSceneObjectType);
+    ImGui::Separator();
+    SceneObjectTypeGroup("Environment", environmentTypes, 2, selectedSceneObjectType);
+    ImGui::Separator();
+    SceneObjectTypeGroup("Lighting", lightingTypes, 1, selectedSceneObjectType);
+    ImGui::EndCombo();
 }
+ImGui::SameLine();
+const bool skyboxAlreadyExists = selectedSceneObjectType == SceneObjectType::Skybox && sceneManager.GetSkybox();
+ImGui::BeginDisabled(skyboxAlreadyExists);
+if (ImGui::Button("Add")) {
+    switch (selectedSceneObjectType) {
+        case SceneObjectType::Triangle: sceneManager.AddPrimitive2D(Primitive2DType::Triangle, creationTexture); break;
+        case SceneObjectType::Plane: sceneManager.AddPrimitive2D(Primitive2DType::Plane, creationTexture); break;
+        case SceneObjectType::Cube: sceneManager.AddPrimitive3D(Primitive3DType::Cube, creationTexture); break;
+        case SceneObjectType::TriangularPrism: sceneManager.AddPrimitive3D(Primitive3DType::TriangularPrism, creationTexture); break;
+        case SceneObjectType::Sphere: sceneManager.AddPrimitive3D(Primitive3DType::Sphere, creationTexture); break;
+        case SceneObjectType::Slab: sceneManager.AddPrimitive3D(Primitive3DType::Slab, creationTexture); break;
+        case SceneObjectType::Terrain: {
+            auto& object = sceneManager.AddTerrain();
+            std::get<Terrain>(object.payload).SetTexturePath(creationTexture);
+            break;
+        }
+        case SceneObjectType::Skybox: sceneManager.AddSkybox(); break;
+        case SceneObjectType::Light: sceneManager.AddLight(); break;
+    }
+}
+ImGui::EndDisabled();
+if (skyboxAlreadyExists && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+    ImGui::SetTooltip("The scene can only contain one skybox.");
 auto& objects=sceneManager.GetSceneObjects();
 std::vector<std::size_t> displayOrder;
 displayOrder.reserve(objects.size());
