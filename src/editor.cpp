@@ -488,10 +488,6 @@ std::vector<std::string> textureFiles = GetAvailableTextures(textureDirectory.st
 static int textureIndex = 0;
 static int sceneObjectSortMode = 0;
 const char* sceneObjectSortModes[] = {"Newest to Oldest", "Oldest to Newest"};
-ImGui::TextUnformatted("Sort");
-ImGui::SameLine();
-ImGui::SetNextItemWidth(220.0f);
-ImGui::Combo("##SceneObjectSort", &sceneObjectSortMode, sceneObjectSortModes, 2);
 if (!textureFiles.empty()) textureIndex = std::min(textureIndex, int(textureFiles.size()-1));
 const std::string creationTexture = textureFiles.empty() ? std::string{} : textureFiles[textureIndex];
 static SceneObjectType selectedSceneObjectType = SceneObjectType::Cube;
@@ -522,6 +518,7 @@ for (const SceneObjectTypeOption& option : environmentTypes)
 for (const SceneObjectTypeOption& option : lightingTypes)
     if (option.type == selectedSceneObjectType) selectedSceneObjectName = option.name;
 
+ImGui::TextUnformatted("Add Object:");
 const float addButtonWidth = ImGui::CalcTextSize("Add").x + ImGui::GetStyle().FramePadding.x * 2.0f;
 ImGui::SetNextItemWidth(std::max(120.0f, ImGui::GetContentRegionAvail().x - addButtonWidth - ImGui::GetStyle().ItemSpacing.x));
 if (ImGui::BeginCombo("##SceneObjectType", selectedSceneObjectName)) {
@@ -557,6 +554,13 @@ if (ImGui::Button("Add")) {
 ImGui::EndDisabled();
 if (skyboxAlreadyExists && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
     ImGui::SetTooltip("The scene can only contain one skybox.");
+
+ImGui::Spacing();
+ImGui::Separator();
+ImGui::TextUnformatted("Object List:");
+ImGui::SetNextItemWidth(-1.0f);
+ImGui::Combo("Sort##SceneObjectSort", &sceneObjectSortMode, sceneObjectSortModes, 2);
+
 auto& objects=sceneManager.GetSceneObjects();
 std::vector<std::size_t> displayOrder;
 displayOrder.reserve(objects.size());
@@ -568,19 +572,9 @@ for(std::size_t sourceIndex:displayOrder){auto& o=*objects[sourceIndex];ImGui::P
  const bool isSkybox=std::holds_alternative<Skybox>(o.payload);
  const bool renderable=!std::holds_alternative<std::monostate>(o.payload);
  const bool objectExpanded=ImGui::CollapsingHeader(objectHeaderLabel.c_str());
- // Keep the per-object pipeline switch visible even when the object's details are collapsed.
- if(renderable){
-  ImGui::Indent();
-  ImGui::TextDisabled("Render Mode");ImGui::SameLine();
-  ImGui::SetNextItemWidth(-1.0f);
-  int mode=int(o.renderMode);const char* modes[]={"Texture","Material"};
-  if(ImGui::Combo("##RenderMode",&mode,modes,2))o.renderMode=RenderMode(mode);
-  ImGui::Unindent();
- }
  if(objectExpanded){char name[128];std::snprintf(name,sizeof(name),"%s",o.name.c_str());if(ImGui::InputText("Name",name,sizeof(name)))o.name=name;
-  ImGui::Checkbox("Enabled",&o.enabled);ImGui::SameLine();ImGui::Checkbox("Visible",&o.visible);
-  if(renderable&&o.renderMode==RenderMode::Material){const auto& ids=materials.GetIds();if(ids.empty())ImGui::TextDisabled("No materials available");else{std::string preview=o.materialId.empty()?"(missing)":o.materialId;if(ImGui::BeginCombo("Material",preview.c_str())){for(const auto&id:ids){bool selected=id==o.materialId;if(ImGui::Selectable(id.c_str(),selected))o.materialId=id;if(selected)ImGui::SetItemDefaultFocus();}ImGui::EndCombo();}}auto warning=materials.GetWarning(o.materialId);if(!warning.empty())ImGui::TextWrapped("Warning: %s",warning.c_str());}
-  if(!isSkybox)ImGui::DragFloat3("Position",&o.transform.position.x,.05f);ImGui::DragFloat3("Rotation",&o.transform.rotation.x,.5f);if(!isSkybox)ImGui::DragFloat3("Scale",&o.transform.scale.x,.05f,.01f,100.f);
+  if(renderable){int mode=int(o.renderMode);const char* modes[]={"Texture","Material"};ImGui::SetNextItemWidth(-1.0f);if(ImGui::Combo("Render Mode",&mode,modes,2))o.renderMode=RenderMode(mode);}
+  if(renderable&&o.renderMode==RenderMode::Material){const auto& ids=materials.GetIds();if(ids.empty())ImGui::TextDisabled("Material: No materials available");else{std::string preview=o.materialId.empty()?"(missing)":o.materialId;ImGui::SetNextItemWidth(-1.0f);if(ImGui::BeginCombo("Material",preview.c_str())){for(const auto&id:ids){bool selected=id==o.materialId;if(ImGui::Selectable(id.c_str(),selected))o.materialId=id;if(selected)ImGui::SetItemDefaultFocus();}ImGui::EndCombo();}}auto warning=materials.GetWarning(o.materialId);if(!warning.empty())ImGui::TextWrapped("Material warning: %s",warning.c_str());}
   std::visit([&](auto& payload){using T=std::decay_t<decltype(payload)>;
    if constexpr(std::is_same_v<T,Primitive2D>||std::is_same_v<T,Primitive3D>){ImGui::Text("Primitive: %s",payload.GetTypeName().c_str());if(o.renderMode==RenderMode::Texture)TextureSelector(textureFiles,payload.GetTexturePath(),[&](const std::string& texture){payload.SetTexturePath(texture);});}
    else if constexpr(std::is_same_v<T,Terrain>){auto& c=payload.GetConfig();ImGui::Text("Terrain: %s / %s",c.geometryType==TerrainGeometryType::Flat?"Flat":"Heightmap",c.plane==TerrainPlane::XY?"XY":c.plane==TerrainPlane::YZ?"YZ":"XZ");ImGui::Text("%d x %d segments, %.1f x %.1f",c.widthSegments,c.depthSegments,c.width,c.depth);if(o.renderMode==RenderMode::Texture)TextureSelector(textureFiles,payload.GetTexturePath(),[&](const std::string& texture){payload.SetTexturePath(texture);});}
@@ -592,6 +586,8 @@ for(std::size_t sourceIndex:displayOrder){auto& o=*objects[sourceIndex];ImGui::P
     if(!payload.GetLastError().empty())ImGui::TextWrapped("Error: %s",payload.GetLastError().c_str());}
    }
    else ImGui::TextUnformatted("No renderable payload");},o.payload);
+  if(!isSkybox)ImGui::DragFloat3("Position",&o.transform.position.x,.05f);ImGui::DragFloat3("Rotation",&o.transform.rotation.x,.5f);if(!isSkybox)ImGui::DragFloat3("Scale",&o.transform.scale.x,.05f,.01f,100.f);
+  ImGui::Checkbox("Enabled",&o.enabled);ImGui::SameLine();ImGui::Checkbox("Visible",&o.visible);
   if(!isSkybox&&o.light){int type=int(o.light->type);const char* types[]={"Point","Directional","Spot"};ImGui::Combo("Light Type",&type,types,3);o.light->type=LightType(type);ImGui::ColorEdit3("Light Color",&o.light->color.x);ImGui::DragFloat("Intensity",&o.light->intensity,.05f,0);ImGui::DragFloat("Range",&o.light->range,.1f,0);ImGui::DragFloat("Inner Cone",&o.light->innerConeAngle,.5f,0,180);ImGui::DragFloat("Outer Cone",&o.light->outerConeAngle,.5f,0,180);if(ImGui::Button("Remove Light Component"))o.light.reset();}
   else if(!isSkybox&&!o.light&&ImGui::Button("Add Light Component"))o.light.emplace();
   if(ImGui::Button("Delete Object"))objectToDelete=sourceIndex;
