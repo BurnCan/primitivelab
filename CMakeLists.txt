@@ -61,6 +61,7 @@ set(COMMON_SOURCES
     src/external/glad.c
     src/Primitives.cpp
     src/SceneManager.cpp
+    src/MaterialRegistry.cpp
     src/Terrain.cpp
     src/Skybox.cpp
     src/Camera.cpp

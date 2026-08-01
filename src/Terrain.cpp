@@ -179,7 +179,7 @@ bool Terrain::IntersectsSphere(const glm::vec3& center, float radius,
     return intersects;
 }
 
-void Terrain::Draw(GLuint shaderProgram)
+void Terrain::Draw()
 {
     glBindVertexArray(VAO);
     glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, 0);

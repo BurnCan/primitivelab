@@ -36,7 +36,7 @@ float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
 // Shader directory
-const std::string SHADER_DIR = ResolveAssetPath("basic.vert", "shaders").parent_path().string() + "/";
+const std::string SHADER_DIR = ResolveAssetPath("texture/basic.vert", "shaders").parent_path().parent_path().string() + "/";
 
 
 
@@ -146,11 +146,6 @@ static void EditorMouseCallback(GLFWwindow* window, double xpos, double ypos) {
 
 
 
-// Shader utilities (same as before)
-std::string LoadShaderSource(const std::string& path);
-GLuint CompileShader(GLenum type, const std::string& source);
-GLuint CompileShaderProgram(const std::string& vertPath, const std::string& fragPath);
-
 int main() {
     // ---------------- GLFW ----------------
     if (!glfwInit()) return -1;
@@ -180,12 +175,11 @@ int main() {
 
 
     // ---------------- Shaders ----------------
-    //GLuint shaderProgram      = CompileShaderProgram(SHADER_DIR + "basic.vert", SHADER_DIR + "basic.frag");
-    //GLuint lightShaderProgram = CompileShaderProgram(SHADER_DIR + "light.vert", SHADER_DIR + "light.frag");
-    Shader shader(SHADER_DIR + "basic.vert", SHADER_DIR + "basic.frag");
-    Shader lightShader(SHADER_DIR + "light.vert", SHADER_DIR + "light.frag");
-    Shader boundingBoxShader(SHADER_DIR + "boundingBox.vert", SHADER_DIR + "boundingBox.frag");
-    Shader skyboxShader(SHADER_DIR + "skybox.vert", SHADER_DIR + "skybox.frag");
+    Shader shader(SHADER_DIR + "texture/basic.vert", SHADER_DIR + "texture/basic.frag");
+    Shader lightShader(SHADER_DIR + "engine/light.vert", SHADER_DIR + "engine/light.frag");
+    Shader boundingBoxShader(SHADER_DIR + "engine/boundingBox.vert", SHADER_DIR + "engine/boundingBox.frag");
+    Shader skyboxShader(SHADER_DIR + "engine/skybox.vert", SHADER_DIR + "engine/skybox.frag");
+    MaterialRegistry materials(SHADER_DIR);
     // ---------------- SceneManager ----------------
 SceneManager sceneManager;
 std::string currentSceneFile; // track currently loaded/saved scene path
@@ -462,7 +456,7 @@ if (sceneFocused) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // Draw all scene objects via SceneManager.
-        sceneManager.drawScene(shader, skyboxShader,
+        sceneManager.drawScene(shader, skyboxShader, materials,
                        useFPSCamera ? fpsCamera : editorCamera,
                        SCR_WIDTH,
                        SCR_HEIGHT);
@@ -574,15 +568,19 @@ for(std::size_t sourceIndex:displayOrder){auto& o=*objects[sourceIndex];ImGui::P
  if(ImGui::CollapsingHeader(objectHeaderLabel.c_str())){char name[128];std::snprintf(name,sizeof(name),"%s",o.name.c_str());if(ImGui::InputText("Name",name,sizeof(name)))o.name=name;
   ImGui::Checkbox("Enabled",&o.enabled);ImGui::SameLine();ImGui::Checkbox("Visible",&o.visible);
   const bool isSkybox=std::holds_alternative<Skybox>(o.payload);
+  const bool renderable=!std::holds_alternative<std::monostate>(o.payload);
+  if(renderable){int mode=int(o.renderMode);const char* modes[]={"Texture","Material"};if(ImGui::Combo("Render Mode",&mode,modes,2))o.renderMode=RenderMode(mode);
+   if(o.renderMode==RenderMode::Material){const auto& ids=materials.GetIds();if(ids.empty())ImGui::TextDisabled("No materials available");else{std::string preview=o.materialId.empty()?"(missing)":o.materialId;if(ImGui::BeginCombo("Material",preview.c_str())){for(const auto&id:ids){bool selected=id==o.materialId;if(ImGui::Selectable(id.c_str(),selected))o.materialId=id;if(selected)ImGui::SetItemDefaultFocus();}ImGui::EndCombo();}}auto warning=materials.GetWarning(o.materialId);if(!warning.empty())ImGui::TextWrapped("Warning: %s",warning.c_str());}}
   if(!isSkybox)ImGui::DragFloat3("Position",&o.transform.position.x,.05f);ImGui::DragFloat3("Rotation",&o.transform.rotation.x,.5f);if(!isSkybox)ImGui::DragFloat3("Scale",&o.transform.scale.x,.05f,.01f,100.f);
   std::visit([&](auto& payload){using T=std::decay_t<decltype(payload)>;
-   if constexpr(std::is_same_v<T,Primitive2D>||std::is_same_v<T,Primitive3D>){ImGui::Text("Primitive: %s",payload.GetTypeName().c_str());TextureSelector(textureFiles,payload.GetTexturePath(),[&](const std::string& texture){payload.SetTexturePath(texture);});}
-   else if constexpr(std::is_same_v<T,Terrain>){auto& c=payload.GetConfig();ImGui::Text("Terrain: %s / %s",c.geometryType==TerrainGeometryType::Flat?"Flat":"Heightmap",c.plane==TerrainPlane::XY?"XY":c.plane==TerrainPlane::YZ?"YZ":"XZ");ImGui::Text("%d x %d segments, %.1f x %.1f",c.widthSegments,c.depthSegments,c.width,c.depth);TextureSelector(textureFiles,payload.GetTexturePath(),[&](const std::string& texture){payload.SetTexturePath(texture);});}
+   if constexpr(std::is_same_v<T,Primitive2D>||std::is_same_v<T,Primitive3D>){ImGui::Text("Primitive: %s",payload.GetTypeName().c_str());if(o.renderMode==RenderMode::Texture)TextureSelector(textureFiles,payload.GetTexturePath(),[&](const std::string& texture){payload.SetTexturePath(texture);});}
+   else if constexpr(std::is_same_v<T,Terrain>){auto& c=payload.GetConfig();ImGui::Text("Terrain: %s / %s",c.geometryType==TerrainGeometryType::Flat?"Flat":"Heightmap",c.plane==TerrainPlane::XY?"XY":c.plane==TerrainPlane::YZ?"YZ":"XZ");ImGui::Text("%d x %d segments, %.1f x %.1f",c.widthSegments,c.depthSegments,c.width,c.depth);if(o.renderMode==RenderMode::Texture)TextureSelector(textureFiles,payload.GetTexturePath(),[&](const std::string& texture){payload.SetTexturePath(texture);});}
    else if constexpr(std::is_same_v<T,Skybox>){
+    if(o.renderMode==RenderMode::Texture){
     if(pendingSkybox!=&payload){pendingSkybox=&payload;auto&c=payload.GetConfig();const std::string* values[]={&c.right,&c.left,&c.top,&c.bottom,&c.front,&c.back};for(int n=0;n<6;++n)std::snprintf(pendingSkyboxPaths[n],sizeof(pendingSkyboxPaths[n]),"%s",values[n]->c_str());}
     const char* labels[]={"Right (+X)","Left (-X)","Top (+Y)","Bottom (-Y)","Front (+Z)","Back (-Z)"};for(int n=0;n<6;++n)ImGui::InputText(labels[n],pendingSkyboxPaths[n],sizeof(pendingSkyboxPaths[n]));
     if(ImGui::Button("Reload Cubemap")){SkyboxConfig c{pendingSkyboxPaths[0],pendingSkyboxPaths[1],pendingSkyboxPaths[2],pendingSkyboxPaths[3],pendingSkyboxPaths[4],pendingSkyboxPaths[5]};if(payload.Reload(c))std::cout<<"[Skybox] Cubemap reloaded\n";}
-    if(!payload.GetLastError().empty())ImGui::TextWrapped("Error: %s",payload.GetLastError().c_str());
+    if(!payload.GetLastError().empty())ImGui::TextWrapped("Error: %s",payload.GetLastError().c_str());}
    }
    else ImGui::TextUnformatted("No renderable payload");},o.payload);
   if(!isSkybox&&o.light){int type=int(o.light->type);const char* types[]={"Point","Directional","Spot"};ImGui::Combo("Light Type",&type,types,3);o.light->type=LightType(type);ImGui::ColorEdit3("Light Color",&o.light->color.x);ImGui::DragFloat("Intensity",&o.light->intensity,.05f,0);ImGui::DragFloat("Range",&o.light->range,.1f,0);ImGui::DragFloat("Inner Cone",&o.light->innerConeAngle,.5f,0,180);ImGui::DragFloat("Outer Cone",&o.light->outerConeAngle,.5f,0,180);if(ImGui::Button("Remove Light Component"))o.light.reset();}
@@ -633,6 +631,11 @@ ImGui::End();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
     glfwDestroyWindow(window);
+    materials.Clear();
+    skyboxShader = Shader{};
+    lightShader = Shader{};
+    shader = Shader{};
+    boundingBoxShader = Shader{};
     glfwTerminate();
     return 0;
 }

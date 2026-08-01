@@ -23,7 +23,7 @@ public:
     Terrain(const Terrain&) = delete;
     Terrain& operator=(const Terrain&) = delete;
 
-    void Draw(GLuint shaderProgram);
+    void Draw();
     void DrawWireframe() const;
     bool IntersectsSphere(const glm::vec3& center, float radius,
                           glm::vec3* contactNormal = nullptr,

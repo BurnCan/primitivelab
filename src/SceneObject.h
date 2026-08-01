@@ -27,6 +27,7 @@ struct Transform {
         return glm::normalize(glm::vec3(Matrix() * glm::vec4(0, 0, -1, 0)));
     }
 };
+enum class RenderMode { Texture, Material };
 enum class LightType { Point, Directional, Spot };
 struct LightComponent {
     LightType type = LightType::Point;
@@ -44,6 +45,8 @@ public:
     std::string name;
     Transform transform;
     bool enabled = true, visible = true;
+    RenderMode renderMode = RenderMode::Texture;
+    std::string materialId = "default";
     SceneObjectPayload payload;
     std::optional<LightComponent> light;
 };
