@@ -574,9 +574,25 @@ for(std::size_t sourceIndex:displayOrder){auto& o=*objects[sourceIndex];ImGui::P
  const bool renderable=!std::holds_alternative<std::monostate>(o.payload);
  const bool objectExpanded=ImGui::CollapsingHeader(objectHeaderLabel.c_str());
  if(objectExpanded){char name[128];std::snprintf(name,sizeof(name),"%s",o.name.c_str());if(ImGui::InputText("Name",name,sizeof(name)))o.name=name;
-  if(renderable){int mode=int(o.renderMode);const char* modes[]={"Texture","Material"};ImGui::TextUnformatted("Render Mode");ImGui::SetNextItemWidth(-1.0f);if(ImGui::Combo("##RenderMode",&mode,modes,2))o.renderMode=RenderMode(mode);}
-  if(renderable&&o.renderMode==RenderMode::Material){const auto& ids=materials.GetIds();ImGui::TextUnformatted("Material");if(ids.empty())ImGui::TextDisabled("No materials available");else{std::string preview=o.materialId.empty()?"(missing)":o.materialId;ImGui::SetNextItemWidth(-1.0f);if(ImGui::BeginCombo("##Material",preview.c_str())){for(const auto&id:ids){bool selected=id==o.materialId;if(ImGui::Selectable(id.c_str(),selected))o.materialId=id;if(selected)ImGui::SetItemDefaultFocus();}ImGui::EndCombo();}}auto warning=materials.GetWarning(o.materialId);if(!warning.empty())ImGui::TextWrapped("Material warning: %s",warning.c_str());}
-  if(renderable&&o.renderMode==RenderMode::Texture)std::visit([&](auto& payload){using T=std::decay_t<decltype(payload)>;if constexpr(std::is_same_v<T,Primitive2D>||std::is_same_v<T,Primitive3D>||std::is_same_v<T,Terrain>)TextureSelector(textureFiles,payload.GetTexturePath(),[&](const std::string& texture){payload.SetTexturePath(texture);});},o.payload);
+  if(renderable){
+   if(ImGui::BeginTable("RenderSettings",2,ImGuiTableFlags_SizingStretchSame)){
+    ImGui::TableNextColumn();
+    int mode=int(o.renderMode);const char* modes[]={"Texture","Material"};
+    ImGui::TextUnformatted("Render Mode");ImGui::SetNextItemWidth(-1.0f);
+    if(ImGui::Combo("##RenderMode",&mode,modes,2))o.renderMode=RenderMode(mode);
+
+    ImGui::TableNextColumn();
+    if(o.renderMode==RenderMode::Material){
+     const auto& ids=materials.GetIds();ImGui::TextUnformatted("Material");
+     if(ids.empty())ImGui::TextDisabled("No materials available");
+     else{std::string preview=o.materialId.empty()?"(missing)":o.materialId;ImGui::SetNextItemWidth(-1.0f);if(ImGui::BeginCombo("##Material",preview.c_str())){for(const auto&id:ids){bool selected=id==o.materialId;if(ImGui::Selectable(id.c_str(),selected))o.materialId=id;if(selected)ImGui::SetItemDefaultFocus();}ImGui::EndCombo();}}
+    }else{
+     std::visit([&](auto& payload){using T=std::decay_t<decltype(payload)>;if constexpr(std::is_same_v<T,Primitive2D>||std::is_same_v<T,Primitive3D>||std::is_same_v<T,Terrain>)TextureSelector(textureFiles,payload.GetTexturePath(),[&](const std::string& texture){payload.SetTexturePath(texture);});},o.payload);
+    }
+    ImGui::EndTable();
+   }
+   if(o.renderMode==RenderMode::Material){auto warning=materials.GetWarning(o.materialId);if(!warning.empty())ImGui::TextWrapped("Material warning: %s",warning.c_str());}
+  }
   std::visit([&](auto& payload){using T=std::decay_t<decltype(payload)>;
    if constexpr(std::is_same_v<T,Primitive2D>||std::is_same_v<T,Primitive3D>){ImGui::Text("Primitive: %s",payload.GetTypeName().c_str());}
    else if constexpr(std::is_same_v<T,Terrain>){auto& c=payload.GetConfig();ImGui::Text("Terrain: %s / %s",c.geometryType==TerrainGeometryType::Flat?"Flat":"Heightmap",c.plane==TerrainPlane::XY?"XY":c.plane==TerrainPlane::YZ?"YZ":"XZ");ImGui::Text("%d x %d segments, %.1f x %.1f",c.widthSegments,c.depthSegments,c.width,c.depth);}
