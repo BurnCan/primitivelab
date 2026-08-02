@@ -73,7 +73,8 @@ detail::PrimitiveMesh::PrimitiveMesh(detail::PrimitiveMeshType type, const std::
     fs::path cleanPath = fs::path(texturePath).filename();
     this->texturePath = cleanPath.string();
 
-    constructShapeMesh();
+    geometry = PrimitiveGeometry::Create(type, X_SEGMENTS, Y_SEGMENTS);
+    mesh.Upload(geometry);
     loadTexture(this->texturePath);
 }
 
@@ -84,16 +85,14 @@ detail::PrimitiveMesh::PrimitiveMesh(detail::PrimitiveMeshType type, const std::
     fs::path cleanPath = fs::path(texturePath).filename();
     this->texturePath = cleanPath.string();
 
-    constructShapeMesh();
+    geometry = PrimitiveGeometry::Create(type, X_SEGMENTS, Y_SEGMENTS);
+    mesh.Upload(geometry);
     loadTexture(this->texturePath);
 }
 
 
 // ---------------- Destructor ----------------
 detail::PrimitiveMesh::~PrimitiveMesh() {
-    if (EBO) glDeleteBuffers(1, &EBO);
-    if (VBO) glDeleteBuffers(1, &VBO);
-    if (VAO) glDeleteVertexArrays(1, &VAO);
     if (textureID) glDeleteTextures(1, &textureID);
 }
 
@@ -147,50 +146,18 @@ detail::PrimitiveMesh::~PrimitiveMesh() {
 // Update all setupXXX() functions to fill localVertices (not a local variable)
 // -----------------------------------------------------------------------------
 
-// ---------------- Shared VAO setup ----------------
-// Configures the VAO/VBO/EBO for the primitive.
-// 'stride' specifies the number of floats per vertex:
-//   3 = positions only (used by Triangle)
-//   8 = positions + normals + texcoords (used by Cube and Sphere)
-void detail::PrimitiveMesh::setupVAO(const std::vector<float>& vertices, const std::vector<unsigned int>& indices, int stride) {
-    indexCount = static_cast<GLsizei>(indices.size());
-    localIndices = indices;
-
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-    glGenBuffers(1, &EBO);
-
-    glBindVertexArray(VAO);
-
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
-
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), indices.data(), GL_STATIC_DRAW);
-
-    if (stride == 3) {
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-        glEnableVertexAttribArray(0);
-    } else if (stride == 8) {
-        // position
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
-        glEnableVertexAttribArray(0);
-        // normal
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
-        glEnableVertexAttribArray(1);
-        // texcoords
-        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
-        glEnableVertexAttribArray(2);
-    }
-
-    glBindVertexArray(0);
+namespace {
+MeshData TypedMeshData(const std::vector<float>& values, std::vector<unsigned int> indices) {
+ MeshData data; data.vertices.reserve(values.size()/8);
+ for(std::size_t i=0;i+7<values.size();i+=8) data.vertices.push_back({{values[i],values[i+1],values[i+2]},{values[i+3],values[i+4],values[i+5]},{values[i+6],values[i+7]}});
+ data.indices=std::move(indices); return data;
+}
 }
 
-
 // ---------------- Triangle setup ----------------
-void detail::PrimitiveMesh::setupTriangle() {
+MeshData detail::PrimitiveGeometry::CreateTriangle() {
     //std::vector<float> vertices = {
-    localVertices = {
+    std::vector<float> localVertices = {
         // positions       // normals       // texcoords
          0.0f,  0.5f, 0.0f, 0,0,1, 0.5f,1.0f, // top
         -0.5f, -0.5f, 0.0f, 0,0,1, 0.0f,0.0f, // bottom left
@@ -199,15 +166,15 @@ void detail::PrimitiveMesh::setupTriangle() {
 
     std::vector<unsigned int> indices = { 0, 1, 2 };
 
-    setupVAO(localVertices, indices); // use the shared setup
+    return TypedMeshData(localVertices, std::move(indices));
 }
 
 // ---------------- Plane setup ----------------
-void detail::PrimitiveMesh::setupPlane() {
+MeshData detail::PrimitiveGeometry::CreatePlane() {
     float h = 0.5f; // half size, makes a 1x1 unit plane
 
     //std::vector<float> vertices = {
-    localVertices = {
+    std::vector<float> localVertices = {
         // positions            // normals        // texcoords
         -h, 0.0f, -h,           0,1,0,           0.0f, 0.0f,
          h, 0.0f, -h,           0,1,0,           1.0f, 0.0f,
@@ -220,11 +187,11 @@ void detail::PrimitiveMesh::setupPlane() {
         2, 3, 0
     };
 
-    setupVAO(localVertices, indices, 8);
+    return TypedMeshData(localVertices, std::move(indices));
 }
 
 // ---------------- Slab setup ----------------
-void detail::PrimitiveMesh::setupSlab() {
+MeshData detail::PrimitiveGeometry::CreateSlab() {
     float width  = 1.0f;
     float depth  = 1.0f;
     float height = 0.1f;
@@ -234,7 +201,7 @@ void detail::PrimitiveMesh::setupSlab() {
     float hh = height * 0.5f;
 
     //std::vector<float> vertices = {
-    localVertices = {
+    std::vector<float> localVertices = {
         // positions                // normals          // texcoords
         // Top face (uses X/Z)
         -hw,  hh, -hd,              0, 1, 0,           0.0f,    0.0f,
@@ -285,15 +252,15 @@ void detail::PrimitiveMesh::setupSlab() {
         indices.push_back(start + 0);
     }
 
-    setupVAO(localVertices, indices, 8);
+    return TypedMeshData(localVertices, std::move(indices));
 }
 
 
 
 // ---------------- Cube setup ----------------
-void detail::PrimitiveMesh::setupCube() {
+MeshData detail::PrimitiveGeometry::CreateCube() {
     //std::vector<float> vertices = {
-    localVertices = {
+    std::vector<float> localVertices = {
         // positions         // normals        // texcoords
         -0.5f,-0.5f,0.5f, 0,0,1, 0,0,
          0.5f,-0.5f,0.5f, 0,0,1, 1,0,
@@ -330,12 +297,12 @@ void detail::PrimitiveMesh::setupCube() {
         20,21,22,22,23,20 // Bottom
     };
 
-    setupVAO(localVertices, indices, 8);
+    return TypedMeshData(localVertices, std::move(indices));
 }
 
 // ---------------- Sphere setup ----------------
-void detail::PrimitiveMesh::setupSphere() {
-    localVertices.clear();
+MeshData detail::PrimitiveGeometry::CreateSphere (unsigned int X_SEGMENTS, unsigned int Y_SEGMENTS) {
+    std::vector<float> localVertices;
     std::vector<unsigned int> indices;
     const float PI = 3.14159265359f;
 
@@ -378,13 +345,13 @@ void detail::PrimitiveMesh::setupSphere() {
         }
     }
 
-    setupVAO(localVertices, indices, 8);
+    return TypedMeshData(localVertices, std::move(indices));
 }
 
 
 
 
-void detail::PrimitiveMesh::setupTriangularPrism() {
+MeshData detail::PrimitiveGeometry::CreateTriangularPrism() {
     float h = 1.0f;        // prism height along Y
     float halfBase = 0.5f; // triangle base along X
     float halfDepth = 0.5f; // triangle depth along Z
@@ -402,7 +369,7 @@ void detail::PrimitiveMesh::setupTriangularPrism() {
     float u3 = 1.0f; // end of strip
 
     //std::vector<float> vertices = {
-    localVertices = {
+    std::vector<float> localVertices = {
         // Top triangle
          0.0f,  h/2,  halfDepth, 0,0,0, 0.5f, 1.0f,
         -halfBase, h/2, -halfDepth, 0,0,0, 0.0f, 0.0f,
@@ -462,7 +429,7 @@ void detail::PrimitiveMesh::setupTriangularPrism() {
         }
     }
 
-    setupVAO(localVertices, indices, 8);
+    return TypedMeshData(localVertices, std::move(indices));
 }
 
 
@@ -522,106 +489,28 @@ void detail::PrimitiveMesh::loadTexture(const std::string& path) {
     stbi_image_free(data);
 }
 
-void detail::PrimitiveMesh::constructShapeMesh() {
-    switch (type) {
-        case detail::PrimitiveMeshType::Cube:            setupCube(); break;
-        case detail::PrimitiveMeshType::TriangularPrism: setupTriangularPrism(); break;
-        case detail::PrimitiveMeshType::Sphere:          setupSphere(); break;
-        case detail::PrimitiveMeshType::Triangle:        setupTriangle(); break;
-        case detail::PrimitiveMeshType::Plane:           setupPlane(); break;
-        case detail::PrimitiveMeshType::Slab:            setupSlab(); break;
-        default: break;
-    }
-
+MeshData detail::PrimitiveGeometry::Create(PrimitiveMeshType type, unsigned int xSegments, unsigned int ySegments) {
+ switch(type) {
+ case PrimitiveMeshType::Cube:return CreateCube(); case PrimitiveMeshType::TriangularPrism:return CreateTriangularPrism();
+ case PrimitiveMeshType::Sphere:return CreateSphere(xSegments,ySegments); case PrimitiveMeshType::Triangle:return CreateTriangle();
+ case PrimitiveMeshType::Plane:return CreatePlane(); case PrimitiveMeshType::Slab:return CreateSlab(); } return {};
 }
-
-
 
 // ---------------- Draw ----------------
 void detail::PrimitiveMesh::draw() const {
     glBindTexture(GL_TEXTURE_2D, textureID);
-    glBindVertexArray(VAO);
-    glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, 0);
-    //glDrawElements(GL_TRIANGLE_STRIP, indexCount, GL_UNSIGNED_INT, 0);
-    glBindVertexArray(0);
+    mesh.Draw();
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 void detail::PrimitiveMesh::drawWireframe() const {
-    glBindVertexArray(VAO);
-    glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, nullptr);
-    glBindVertexArray(0);
+    mesh.Draw();
 }
 
-namespace {
-glm::vec3 ClosestPointOnTriangle(const glm::vec3& point, const glm::vec3& a,
-                                 const glm::vec3& b, const glm::vec3& c) {
-    const glm::vec3 ab = b - a;
-    const glm::vec3 ac = c - a;
-    const glm::vec3 ap = point - a;
-    const float d1 = glm::dot(ab, ap);
-    const float d2 = glm::dot(ac, ap);
-    if (d1 <= 0.0f && d2 <= 0.0f) return a;
-
-    const glm::vec3 bp = point - b;
-    const float d3 = glm::dot(ab, bp);
-    const float d4 = glm::dot(ac, bp);
-    if (d3 >= 0.0f && d4 <= d3) return b;
-
-    const float vc = d1 * d4 - d3 * d2;
-    if (vc <= 0.0f && d1 >= 0.0f && d3 <= 0.0f)
-        return a + (d1 / (d1 - d3)) * ab;
-
-    const glm::vec3 cp = point - c;
-    const float d5 = glm::dot(ab, cp);
-    const float d6 = glm::dot(ac, cp);
-    if (d6 >= 0.0f && d5 <= d6) return c;
-
-    const float vb = d5 * d2 - d1 * d6;
-    if (vb <= 0.0f && d2 >= 0.0f && d6 <= 0.0f)
-        return a + (d2 / (d2 - d6)) * ac;
-
-    const float va = d3 * d6 - d5 * d4;
-    if (va <= 0.0f && (d4 - d3) >= 0.0f && (d5 - d6) >= 0.0f)
-        return b + ((d4 - d3) / ((d4 - d3) + (d5 - d6))) * (c - b);
-
-    const float denominator = 1.0f / (va + vb + vc);
-    return a + ab * (vb * denominator) + ac * (vc * denominator);
-}
+bool detail::PrimitiveMesh::IntersectsSphere(const glm::vec3& center, float radius, glm::vec3* contactNormal) const {
+ return IntersectsSphereMesh(center, radius, geometry, modelMatrix, contactNormal);
 }
 
-bool detail::PrimitiveMesh::IntersectsSphere(const glm::vec3& center, float radius,
-                                 glm::vec3* contactNormal) const {
-    const float radiusSquared = radius * radius;
-    float closestDistanceSquared = radiusSquared;
-    bool intersects = false;
-    for (size_t i = 0; i + 2 < localIndices.size(); i += 3) {
-        glm::vec3 triangle[3];
-        for (int vertex = 0; vertex < 3; ++vertex) {
-            const size_t offset = static_cast<size_t>(localIndices[i + vertex]) * 8;
-            triangle[vertex] = glm::vec3(modelMatrix * glm::vec4(
-                localVertices[offset], localVertices[offset + 1], localVertices[offset + 2], 1.0f));
-        }
-        const glm::vec3 closest = ClosestPointOnTriangle(center, triangle[0], triangle[1], triangle[2]);
-        const glm::vec3 separation = center - closest;
-        const float distanceSquared = glm::dot(separation, separation);
-        if (distanceSquared <= radiusSquared && (!intersects || distanceSquared < closestDistanceSquared)) {
-            intersects = true;
-            closestDistanceSquared = distanceSquared;
-
-            if (contactNormal) {
-                if (distanceSquared > 0.0000001f) {
-                    *contactNormal = separation / glm::sqrt(distanceSquared);
-                } else {
-                    const glm::vec3 triangleNormal = glm::cross(
-                        triangle[1] - triangle[0], triangle[2] - triangle[0]);
-                    const float normalLengthSquared = glm::dot(triangleNormal, triangleNormal);
-                    *contactNormal = normalLengthSquared > 0.0000001f
-                        ? triangleNormal / glm::sqrt(normalLengthSquared)
-                        : glm::vec3(0.0f);
-                }
-            }
-        }
-    }
-    return intersects;
-}
+std::string detail::PrimitiveMesh::GetTypeName() const { switch(type) {
+ case PrimitiveMeshType::Cube:return "Cube"; case PrimitiveMeshType::TriangularPrism:return "Triangular Prism"; case PrimitiveMeshType::Sphere:return "Sphere";
+ case PrimitiveMeshType::Triangle:return "Triangle"; case PrimitiveMeshType::Plane:return "Plane"; case PrimitiveMeshType::Slab:return "Slab";} return "Unknown"; }
