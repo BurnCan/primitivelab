@@ -1,22 +1,9 @@
 #include "Skybox.h"
-#include "AssetPaths.h"
+#include "SkyboxAssets.h"
 #include <stb_image.h>
 #include <array>
-#include <filesystem>
 #include <iostream>
 #include <utility>
-
-namespace {
-std::filesystem::path ResolveFace(const std::string& path) {
-    namespace fs = std::filesystem;
-    fs::path p(path);
-    if (p.is_absolute() || fs::exists(p)) return p;
-    const fs::path candidates[] = {fs::current_path() / p, fs::current_path().parent_path() / p,
-        fs::path(PRIMITIVELAB_ASSET_ROOT) / p, fs::path(PRIMITIVELAB_ASSET_ROOT) / "textures" / p};
-    for (const auto& candidate : candidates) if (fs::exists(candidate)) return candidate;
-    return fs::path(PRIMITIVELAB_ASSET_ROOT) / p;
-}
-}
 
 Skybox::Skybox(const SkyboxConfig& initial) {
     constexpr float vertices[] = {
@@ -32,8 +19,7 @@ Skybox::Skybox(const SkyboxConfig& initial) {
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
     glEnableVertexAttribArray(0); glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3*sizeof(float), nullptr);
     glBindVertexArray(0);
-    if (!initial.right.empty() || !initial.left.empty() || !initial.top.empty() ||
-        !initial.bottom.empty() || !initial.front.empty() || !initial.back.empty()) Reload(initial);
+    if (!initial.name.empty()) Reload(initial);
 }
 
 Skybox::~Skybox() { Release(); }
@@ -50,19 +36,24 @@ void Skybox::Release() {
 
 bool Skybox::Reload(const SkyboxConfig& requested) {
     lastError.clear();
-    const std::array<std::pair<const char*,const std::string*>,6> faces{{
-        {"right (+X)",&requested.right},{"left (-X)",&requested.left},{"top (+Y)",&requested.top},
-        {"bottom (-Y)",&requested.bottom},{"front (+Z)",&requested.front},{"back (-Z)",&requested.back}}};
+    const auto resolved = SkyboxAssets::Resolve(requested.name, lastError);
+    if (!resolved) {
+        std::cerr << "[Skybox] " << lastError << (cubemap ? "; previous cubemap retained" : "; skybox remains invalid") << '\n';
+        return false;
+    }
+    const std::array<std::pair<const char*,const std::filesystem::path*>,6> faces{{
+        {"right (+X)",&resolved->right},{"left (-X)",&resolved->left},{"top (+Y)",&resolved->top},
+        {"bottom (-Y)",&resolved->bottom},{"front (+Z)",&resolved->front},{"back (-Z)",&resolved->back}}};
     GLuint candidate=0; glGenTextures(1,&candidate); glBindTexture(GL_TEXTURE_CUBE_MAP,candidate);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     int expectedW=0, expectedH=0, expectedChannels=0;
     stbi_set_flip_vertically_on_load(false);
     for (std::size_t i=0;i<faces.size();++i) {
-        const auto resolved=ResolveFace(*faces[i].second); int w=0,h=0,channels=0;
-        unsigned char* data=stbi_load(resolved.string().c_str(),&w,&h,&channels,0);
-        if (!data) { const char* reason=stbi_failure_reason();lastError="Failed to load " + std::string(faces[i].first) + " face '" + *faces[i].second + "': " + (reason?reason:"unknown image error"); }
-        else if (channels!=3 && channels!=4) { lastError="Unsupported channel count for " + std::string(faces[i].first) + " face '" + *faces[i].second + "'"; }
-        else if (i && (w!=expectedW || h!=expectedH || channels!=expectedChannels)) { lastError="Dimension/channel mismatch for " + std::string(faces[i].first) + " face '" + *faces[i].second + "'"; }
+        const auto& path=*faces[i].second; int w=0,h=0,channels=0;
+        unsigned char* data=stbi_load(path.string().c_str(),&w,&h,&channels,0);
+        if (!data) { const char* reason=stbi_failure_reason();lastError="Failed to load " + std::string(faces[i].first) + " face '" + path.string() + "': " + (reason?reason:"unknown image error"); }
+        else if (channels!=3 && channels!=4) { lastError="Unsupported channel count for " + std::string(faces[i].first) + " face '" + path.string() + "'"; }
+        else if (i && (w!=expectedW || h!=expectedH || channels!=expectedChannels)) { lastError="Dimension/channel mismatch for " + std::string(faces[i].first) + " face '" + path.string() + "'"; }
         if (!data || !lastError.empty()) { if(data)stbi_image_free(data); stbi_set_flip_vertically_on_load(true); glPixelStorei(GL_UNPACK_ALIGNMENT,4); glDeleteTextures(1,&candidate);
             std::cerr<<"[Skybox] "<<lastError<<(cubemap?"; previous cubemap retained":"; skybox remains invalid")<<'\n'; return false; }
         if (!i) { expectedW=w; expectedH=h; expectedChannels=channels; }
