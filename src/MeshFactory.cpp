@@ -41,6 +41,7 @@ MeshData CreateCube();
 MeshData CreateSlab();
 MeshData CreateTriangularPrism();
 MeshData CreateSphere(unsigned int, unsigned int);
+MeshData CreateRock();
 }
 
 namespace {
@@ -50,6 +51,47 @@ MeshData TypedMeshData(const std::vector<float>& values, std::vector<unsigned in
  data.indices=std::move(indices); return data;
 }
 }
+
+// ---------------- Rock setup ----------------
+MeshData MeshGeneration::CreateRock() {
+    std::vector<float> localVertices = {
+        // positions              // normals          // texcoords
+
+        // Base
+    -0.467770815f, -0.477016717f, -0.38251707f, -0.548177242f, -0.747286081f, 0.375586629f, 0.0f, 0.0f,
+    0.405647159f, -0.518806696f, -0.370780468f, -0.487694502f, -0.80298835f, 0.342584163f, 0.933747292f, 0.0142049817f,
+    0.203193307f, 0.091897577f, -0.0833028257f, -0.425442696f, -0.185806394f, 0.885705709f, 0.717309415f, 0.362143397f,
+    -0.12446475f, 0.123544455f, -0.266472578f, -0.613453865f, 0.775359392f, 0.149973854f, 0.367019117f, 0.140450358f,
+    -0.463334203f, -0.496991307f, 0.379545957f, -0.437826157f, -0.437254936f, 0.785567462f, 0.00474306056f, 0.922336102f,
+    0.4676193f, -0.496454954f, 0.443714261f, -0.329319268f, -0.874644995f, 0.355731517f, 1.0f, 1.0f,
+    0.117086768f, 0.134675384f, 0.28392005f, -0.675754726f, 0.170806259f, 0.717064023f, 0.625255227f, 0.806598723f,
+    -0.303527951f, 0.0646477044f, 0.32624054f, -0.79199934f, 0.591188431f, 0.152424723f, 0.17558755f, 0.857819796f
+
+        // Add separately duplicated vertices for each side.
+        // Each side needs its own face normal and UV coordinates.
+    };
+
+    std::vector<unsigned int> indices = {
+    0, 1, 2,
+    2, 3, 0,
+    4, 5, 6,
+    6, 7, 4,
+    0, 4, 7,
+    7, 3, 0,
+    1, 5, 6,
+    6, 2, 1,
+    3, 7, 6,
+    6, 2, 3,
+    0, 1, 5,
+    5, 4, 0
+
+
+        // Add side triangles here.
+    };
+
+    return TypedMeshData(localVertices, std::move(indices));
+}
+
 
 // ---------------- Triangle setup ----------------
 MeshData MeshGeneration::CreateTriangle() {
@@ -340,6 +382,7 @@ MeshSource MeshSources::Slab() { return SlabMeshSource{}; }
 MeshSource MeshSources::TriangularPrism() { return TriangularPrismMeshSource{}; }
 MeshSource MeshSources::Sphere(unsigned int x, unsigned int y) { return SphereMeshSource{x, y}; }
 MeshSource MeshSources::Terrain(const TerrainMeshSource& source) { return source; }
+MeshSource MeshSources::Rock() { return RockMeshSource{};}
 
 MeshData MeshFactory::Create(const MeshSource& source) {
     return std::visit([](const auto& definition) -> MeshData {
@@ -350,6 +393,7 @@ MeshData MeshFactory::Create(const MeshSource& source) {
         else if constexpr (std::is_same_v<T, SlabMeshSource>) return MeshGeneration::CreateSlab();
         else if constexpr (std::is_same_v<T, TriangularPrismMeshSource>) return MeshGeneration::CreateTriangularPrism();
         else if constexpr (std::is_same_v<T, SphereMeshSource>) return MeshGeneration::CreateSphere(definition.xSegments, definition.ySegments);
+        else if constexpr (std::is_same_v<T, RockMeshSource>) return MeshGeneration::CreateRock();
         else return TerrainGeometry::CreateMeshData(definition);
     }, source);
 }
@@ -406,6 +450,7 @@ std::string MeshObject::GetSourceName() const {
         else if constexpr (std::is_same_v<T, SlabMeshSource>) return "Slab";
         else if constexpr (std::is_same_v<T, TriangularPrismMeshSource>) return "Triangular Prism";
         else if constexpr (std::is_same_v<T, SphereMeshSource>) return "Sphere";
+        else if constexpr (std::is_same_v<T, RockMeshSource>) return "Rock";
         else return "Terrain";
     }, source);
 }

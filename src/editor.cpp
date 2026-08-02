@@ -59,6 +59,7 @@ enum class CreationOption {
     Slab,
     Terrain,
     Skybox,
+    Rock,
     Light
 };
 
@@ -543,6 +544,7 @@ static const CreationOptionOption primitive3DTypes[] = {
 };
 static const CreationOptionOption environmentTypes[] = {
     {CreationOption::Terrain, "Terrain"},
+    {CreationOption::Rock, "Rock"},
     {CreationOption::Skybox, "Skybox"}
 };
 static const CreationOptionOption lightingTypes[] = {
@@ -566,7 +568,7 @@ if (ImGui::BeginCombo("##CreationOption", selectedSceneObjectName)) {
     ImGui::Separator();
     CreationOptionGroup("Primitives 3D", primitive3DTypes, 4, selectedCreationOption);
     ImGui::Separator();
-    CreationOptionGroup("Environment", environmentTypes, 2, selectedCreationOption);
+    CreationOptionGroup("Environment", environmentTypes, 3, selectedCreationOption);
     ImGui::Separator();
     CreationOptionGroup("Lighting", lightingTypes, 1, selectedCreationOption);
     ImGui::EndCombo();
@@ -582,6 +584,7 @@ if (ImGui::Button("Add")) {
         case CreationOption::TriangularPrism: sceneManager.AddMesh(MeshSources::TriangularPrism(), creationTexture); break;
         case CreationOption::Sphere: sceneManager.AddMesh(MeshSources::Sphere(), creationTexture); break;
         case CreationOption::Slab: sceneManager.AddMesh(MeshSources::Slab(), creationTexture); break;
+        case CreationOption::Rock: sceneManager.AddMesh(MeshSources::Rock(), creationTexture); break;
         case CreationOption::Terrain: {
             auto& object = sceneManager.AddTerrain();
             std::get<Terrain>(object.payload).SetTexturePath(creationTexture);
@@ -589,6 +592,7 @@ if (ImGui::Button("Add")) {
         }
         case CreationOption::Skybox: sceneManager.AddSkybox(); break;
         case CreationOption::Light: sceneManager.AddLight(); break;
+        
     }
 }
 ImGui::EndDisabled();
