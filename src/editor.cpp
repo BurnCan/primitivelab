@@ -129,6 +129,24 @@ static void TextureSelector(const std::vector<std::string>& textureFiles,
     }
 }
 
+static void SkyboxTextureSelector(const std::vector<std::string>& skyboxNames, Skybox& skybox) {
+    const std::string& current = skybox.GetConfig().name;
+    const char* preview = current.empty() ? "No skybox selected" : current.c_str();
+
+    ImGui::TextUnformatted("Texture");
+    ImGui::SetNextItemWidth(-1.0f);
+    if (ImGui::BeginCombo("##Texture", preview)) {
+        if (skyboxNames.empty()) ImGui::TextDisabled("No valid skyboxes found");
+        for (const auto& name : skyboxNames) {
+            const bool selected = name == current;
+            if (ImGui::Selectable(name.c_str(), selected) && skybox.Reload({name}))
+                std::cout << "[Skybox] Loaded '" << name << "'\n";
+            if (selected) ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+}
+
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
     SCR_WIDTH = width;
     SCR_HEIGHT = height;
@@ -608,7 +626,7 @@ for(std::size_t sourceIndex:displayOrder){auto& o=*objects[sourceIndex];ImGui::P
      if(ids.empty())ImGui::TextDisabled("No materials available");
      else{std::string preview=o.materialId.empty()?"(missing)":o.materialId;ImGui::SetNextItemWidth(-1.0f);if(ImGui::BeginCombo("##Material",preview.c_str())){for(const auto&id:ids){bool selected=id==o.materialId;if(ImGui::Selectable(id.c_str(),selected))o.materialId=id;if(selected)ImGui::SetItemDefaultFocus();}ImGui::EndCombo();}}
     }else{
-     std::visit([&](auto& payload){using T=std::decay_t<decltype(payload)>;if constexpr(std::is_same_v<T,Primitive2D>||std::is_same_v<T,Primitive3D>||std::is_same_v<T,Terrain>)TextureSelector(textureFiles,payload.GetTexturePath(),[&](const std::string& texture){payload.SetTexturePath(texture);});},o.payload);
+     std::visit([&](auto& payload){using T=std::decay_t<decltype(payload)>;if constexpr(std::is_same_v<T,Primitive2D>||std::is_same_v<T,Primitive3D>||std::is_same_v<T,Terrain>)TextureSelector(textureFiles,payload.GetTexturePath(),[&](const std::string& texture){payload.SetTexturePath(texture);});else if constexpr(std::is_same_v<T,Skybox>)SkyboxTextureSelector(skyboxNames,payload);},o.payload);
     }
     ImGui::EndTable();
    }
@@ -619,9 +637,6 @@ for(std::size_t sourceIndex:displayOrder){auto& o=*objects[sourceIndex];ImGui::P
    else if constexpr(std::is_same_v<T,Terrain>){auto& c=payload.GetConfig();ImGui::Text("Terrain: %s / %s",c.geometryType==TerrainGeometryType::Flat?"Flat":"Heightmap",c.plane==TerrainPlane::XY?"XY":c.plane==TerrainPlane::YZ?"YZ":"XZ");ImGui::Text("%d x %d segments, %.1f x %.1f",c.widthSegments,c.depthSegments,c.width,c.depth);}
    else if constexpr(std::is_same_v<T,Skybox>){
     if(o.renderMode==RenderMode::Texture){
-    const std::string& current=payload.GetConfig().name;const char* preview=current.empty()?"No skybox selected":current.c_str();
-    ImGui::TextUnformatted("Skybox");ImGui::SetNextItemWidth(-1.0f);
-    if(ImGui::BeginCombo("##Skybox",preview)){if(skyboxNames.empty())ImGui::TextDisabled("No valid skyboxes found");for(const auto&name:skyboxNames){bool selected=name==current;if(ImGui::Selectable(name.c_str(),selected)){if(payload.Reload({name}))std::cout<<"[Skybox] Loaded '"<<name<<"'\n";}if(selected)ImGui::SetItemDefaultFocus();}ImGui::EndCombo();}
     if(ImGui::Button("Refresh Skyboxes"))skyboxNames=SkyboxAssets::Discover();
     if(!payload.GetLastError().empty())ImGui::TextWrapped("Error: %s",payload.GetLastError().c_str());}
    }
