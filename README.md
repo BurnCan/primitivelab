@@ -156,3 +156,39 @@ Or from inside the `build` directory:
 ## Shader assets and render modes
 
 Renderable scene objects can independently use the texture pipeline or a discovered material. Texture shaders live in `shaders/texture`, internal renderer shaders and the shared material vertex shader live in `shaders/engine`, and selectable fragment shaders live directly in `shaders/material`. Adding a `.frag` file to `shaders/material` makes it available at the next application start without C++ registration. Material IDs are lowercase filename stems.
+
+## Skybox assets and scenes
+
+Named skyboxes live in `textures/skyboxes/<skybox-name>/`. The directory name is the
+logical skybox name selected in the editor and stored in scene files. Each directory
+must contain all six lowercase face names: `right`, `left`, `top`, `bottom`, `front`,
+and `back`. A face may use a lowercase `.png`, `.jpg`, or `.jpeg` extension, and the
+extensions may be mixed within one skybox. For example:
+
+```text
+textures/
+└── skyboxes/
+    └── sky1/
+        ├── right.jpg
+        ├── left.jpg
+        ├── top.png
+        ├── bottom.jpeg
+        ├── front.jpg
+        └── back.jpg
+```
+
+Both face names and extensions are case-sensitive and must be lowercase. More than
+one supported file for a face (for example, both `right.png` and `right.jpg`) makes
+the skybox invalid. All six decoded images must also have matching dimensions and
+channel counts, and each image must have three or four channels.
+
+The editor discovers complete, valid skyboxes once at startup. Use **Refresh
+Skyboxes** to rescan after changing the asset directories; discovery is not performed
+every frame. Invalid or incomplete directories are ignored and reported through
+console warnings, while image loading failures are shown as loader errors. A scene
+stores only the portable logical name, rather than individual image paths or absolute
+filesystem paths:
+
+```text
+Skybox sky1 0 0 0 RenderMode Texture Material default
+```

@@ -18,6 +18,7 @@
 #include "SceneManager.h"
 #include "ShaderUtils.h"
 #include "AssetPaths.h"
+#include "SkyboxAssets.h"
 #include "KeyboardInput.h"
 
 // ImGui
@@ -47,8 +48,6 @@ const std::string SHADER_DIR = ResolveAssetPath("texture/basic.vert", "shaders")
 //Bounding box
 static bool showCollisionMeshes = false;
 static bool showTerrainMesh = false;
-static Skybox* pendingSkybox = nullptr;
-static char pendingSkyboxPaths[6][512]{};
 
 enum class SceneObjectType {
     Triangle,
@@ -205,6 +204,7 @@ int main() {
     MaterialRegistry materials(SHADER_DIR);
     // ---------------- SceneManager ----------------
 SceneManager sceneManager;
+std::vector<std::string> skyboxNames = SkyboxAssets::Discover();
 std::string currentSceneFile; // track currently loaded/saved scene path
 
 std::string defaultScenePath = ResolveAssetPath("default.txt", "scenes").string();
@@ -303,7 +303,6 @@ glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         if (ImGui::MenuItem("New Scene", "Ctrl+N")) {
     // Clear current scene
     sceneManager.Clear();
-    pendingSkybox = nullptr;
     currentSceneFile.clear();
 
     // Prompt for a filename
@@ -338,7 +337,6 @@ glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
             );
             if (path) {
                 if (sceneManager.loadScene(path)) {
-                    pendingSkybox = nullptr;
                     currentSceneFile = path;
                     std::cout << "Opened scene: " << path << std::endl;
                 } else {
@@ -621,9 +619,10 @@ for(std::size_t sourceIndex:displayOrder){auto& o=*objects[sourceIndex];ImGui::P
    else if constexpr(std::is_same_v<T,Terrain>){auto& c=payload.GetConfig();ImGui::Text("Terrain: %s / %s",c.geometryType==TerrainGeometryType::Flat?"Flat":"Heightmap",c.plane==TerrainPlane::XY?"XY":c.plane==TerrainPlane::YZ?"YZ":"XZ");ImGui::Text("%d x %d segments, %.1f x %.1f",c.widthSegments,c.depthSegments,c.width,c.depth);}
    else if constexpr(std::is_same_v<T,Skybox>){
     if(o.renderMode==RenderMode::Texture){
-    if(pendingSkybox!=&payload){pendingSkybox=&payload;auto&c=payload.GetConfig();const std::string* values[]={&c.right,&c.left,&c.top,&c.bottom,&c.front,&c.back};for(int n=0;n<6;++n)std::snprintf(pendingSkyboxPaths[n],sizeof(pendingSkyboxPaths[n]),"%s",values[n]->c_str());}
-    const char* labels[]={"Right (+X)","Left (-X)","Top (+Y)","Bottom (-Y)","Front (+Z)","Back (-Z)"};for(int n=0;n<6;++n){ImGui::TextUnformatted(labels[n]);ImGui::SetNextItemWidth(-1.0f);ImGui::PushID(n);ImGui::InputText("##CubemapFace",pendingSkyboxPaths[n],sizeof(pendingSkyboxPaths[n]));ImGui::PopID();}
-    if(ImGui::Button("Reload Cubemap")){SkyboxConfig c{pendingSkyboxPaths[0],pendingSkyboxPaths[1],pendingSkyboxPaths[2],pendingSkyboxPaths[3],pendingSkyboxPaths[4],pendingSkyboxPaths[5]};if(payload.Reload(c))std::cout<<"[Skybox] Cubemap reloaded\n";}
+    const std::string& current=payload.GetConfig().name;const char* preview=current.empty()?"No skybox selected":current.c_str();
+    ImGui::TextUnformatted("Skybox");ImGui::SetNextItemWidth(-1.0f);
+    if(ImGui::BeginCombo("##Skybox",preview)){if(skyboxNames.empty())ImGui::TextDisabled("No valid skyboxes found");for(const auto&name:skyboxNames){bool selected=name==current;if(ImGui::Selectable(name.c_str(),selected)){if(payload.Reload({name}))std::cout<<"[Skybox] Loaded '"<<name<<"'\n";}if(selected)ImGui::SetItemDefaultFocus();}ImGui::EndCombo();}
+    if(ImGui::Button("Refresh Skyboxes"))skyboxNames=SkyboxAssets::Discover();
     if(!payload.GetLastError().empty())ImGui::TextWrapped("Error: %s",payload.GetLastError().c_str());}
    }
    else ImGui::TextUnformatted("No renderable payload");},o.payload);
@@ -641,7 +640,7 @@ for(std::size_t sourceIndex:displayOrder){auto& o=*objects[sourceIndex];ImGui::P
   else if(!isSkybox&&!o.light&&ImGui::Button("Add Light Component"))o.light.emplace();
   if(ImGui::Button("Delete Object"))objectToDelete=sourceIndex;
  }ImGui::PopID();}
-if(objectToDelete){if(std::holds_alternative<Skybox>(objects[*objectToDelete]->payload))pendingSkybox=nullptr;sceneManager.RemoveSceneObject(*objectToDelete);}
+if(objectToDelete)sceneManager.RemoveSceneObject(*objectToDelete);
 ImGui::End();
 
 // ---------------- Debug Window ----------------

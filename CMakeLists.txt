@@ -64,6 +64,7 @@ set(COMMON_SOURCES
     src/MaterialRegistry.cpp
     src/Terrain.cpp
     src/Skybox.cpp
+    src/SkyboxAssets.cpp
     src/Camera.cpp
     src/stb_image_impl.cpp
 )

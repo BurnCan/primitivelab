@@ -1,5 +1,5 @@
 # PrimitiveType TexturePath position rotation scale
-# Skybox right left top bottom front back rotation
+# Skybox name rotation
 # Terrain geometry plane texture segments dimensions heightScale position rotation scale
 # Light legacy or: Light Type position rotation color intensity range innerAngle outerAngle
 Terrain Flat XZ textures/grass.jpg 20 20 20 20 1 0 0 0 0 0 0 1 1 1
@@ -12,4 +12,4 @@ Light Point 0 1.552 -5 0 0 0 1 0 0 1 10 20 30
 Light Point -5 1.595 2 0 0 0 0 1 0 1 10 20 30
 Light Point 5.011 1.595 2 0 0 0 0 0 1 1 10 20 30
 Light Point 0 5.194 0 0 0 0 1 1 1 1 10 20 30
-Skybox textures/skyboxes/sky1/right.jpg textures/skyboxes/sky1/left.jpg textures/skyboxes/sky1/top.jpg textures/skyboxes/sky1/bottom.jpg textures/skyboxes/sky1/front.jpg textures/skyboxes/sky1/back.jpg 0 0 0
+Skybox sky1 0 0 0 RenderMode Texture Material default

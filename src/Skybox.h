@@ -4,7 +4,7 @@
 #include <string>
 
 struct SkyboxConfig {
-    std::string right, left, top, bottom, front, back;
+    std::string name;
 };
 
 class Skybox {
