@@ -157,6 +157,11 @@ Or from inside the `build` directory:
 
 Renderable scene objects can independently use the texture pipeline or a discovered material. Texture shaders live in `shaders/texture`, internal renderer shaders and the shared material vertex shader live in `shaders/engine`, and selectable fragment shaders live directly in `shaders/material`. Adding a `.frag` file to `shaders/material` makes it available at the next application start without C++ registration. Material IDs are lowercase filename stems.
 
+The included `cloudy_sky` material uses the object-space direction supplied by the
+shared material vertex shader to render seamless procedural clouds. Select the
+skybox in the editor, change its render mode to **Material**, and choose
+`cloudy_sky` from the material list.
+
 ## Skybox assets and scenes
 
 Named skyboxes live in `textures/skyboxes/<skybox-name>/`. The directory name is the
