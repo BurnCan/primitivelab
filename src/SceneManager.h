@@ -22,8 +22,7 @@ public:
     const std::vector<std::unique_ptr<SceneObject>>& GetSceneObjects() const { return sceneObjects; }
     std::vector<std::unique_ptr<SceneObject>>& GetSceneObjects() { return sceneObjects; }
     bool RemoveSceneObject(std::size_t);
-    SceneObject& AddPrimitive2D(Primitive2DType, const std::string&);
-    SceneObject& AddPrimitive3D(Primitive3DType, const std::string&, unsigned = 32, unsigned = 32);
+    SceneObject& AddMesh(MeshSource, const std::string&);
     SceneObject& AddTerrain(const TerrainConfig& = {});
     SceneObject& AddSkybox(const SkyboxConfig& = {});
     SceneObject* GetSkybox();
@@ -32,5 +31,5 @@ public:
     void Clear() { sceneObjects.clear(); }
 private:
     std::vector<std::unique_ptr<SceneObject>> sceneObjects;
-    Primitive3D lightGizmoSphere{Primitive3DType::Sphere, "sun.jpg", 16, 16};
+    MeshObject lightGizmoSphere{MeshSources::Sphere(16, 16), "sun.jpg"};
 };

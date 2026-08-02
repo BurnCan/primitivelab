@@ -7,7 +7,7 @@
 #include <iostream>
 #include <filesystem>
 #include <memory>
-#include "Primitives.h"
+#include "TextureUtils.h"
 #include "Camera.h"
 #include "SceneManager.h"
 #include "ShaderUtils.h"
@@ -130,9 +130,9 @@ int main() {
     // ---------------- Scene Load ----------------
     if (!scene.loadScene(ResolveAssetPath("default.txt", "scenes").string())) {
         std::cout << "No scene found, creating default one...\n";
-        scene.AddPrimitive3D(Primitive3DType::Cube, "textures/brick.jpg");
-        scene.AddPrimitive3D(Primitive3DType::TriangularPrism, "textures/wood.jpg");
-        scene.AddPrimitive3D(Primitive3DType::Sphere, "textures/earth.jpg",16,16);
+        scene.AddMesh(MeshSources::Cube(), "textures/brick.jpg");
+        scene.AddMesh(MeshSources::TriangularPrism(), "textures/wood.jpg");
+        scene.AddMesh(MeshSources::Sphere(16, 16), "textures/earth.jpg");
 
         scene.AddLight().transform.position = glm::vec3(-2.0f,1.0f,-2.0f);
     }

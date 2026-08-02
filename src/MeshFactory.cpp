@@ -1,4 +1,7 @@
-#include "Primitives.h"
+#include "TextureUtils.h"
+#include "MeshObject.h"
+#include "Terrain.h"
+#include <type_traits>
 #include <stb_image.h>
 #include <iostream>
 #include <cmath>
@@ -31,120 +34,14 @@ std::vector<std::string> GetAvailableTextures(const std::string& dir) {
     return textures;
 }
 
-void detail::PrimitiveMesh::SetTexturePath(const std::string& newPath) {
-    // Normalize to filename only
-    fs::path cleanPath = fs::path(newPath).filename();
-    texturePath = cleanPath.string();
-    ReloadTexture();
+namespace MeshGeneration {
+MeshData CreateTriangle();
+MeshData CreatePlane();
+MeshData CreateCube();
+MeshData CreateSlab();
+MeshData CreateTriangularPrism();
+MeshData CreateSphere(unsigned int, unsigned int);
 }
-
-void detail::PrimitiveMesh::ReloadTexture() {
-    if (textureID != 0) {
-        glDeleteTextures(1, &textureID);
-        textureID = 0;
-    }
-    if (!texturePath.empty()) {
-        loadTexture(texturePath);
-    }
-}
-
-// ---- How to Add a New Primitive ----
-// 1. Add a new value to the PrimitiveType enum in Primitives.h.
-//    Example: TriangularPrism
-//
-// 2. Declare a setup function for the new primitive in the Primitive class.
-//    Example: void setupTriangularPrism();
-//
-// 3. Implement the setup function in Primitives.cpp:
-//    - Define the vertices (positions, normals, texcoords) for your shape.
-//    - Define the indices for glDrawElements.
-//    - Call setupVAO(vertices, indices, stride); (stride = 3 for position-only, 8 for pos+norm+tex)
-//
-// 4. Update constructShapeMesh() to handle the new PrimitiveType value
-//    and call the corresponding setup function.
-//
-// 5. Optionally, add a constructor overload if special parameters (like segments) are needed.
-
-// ---------------- Constructors ----------------
-detail::PrimitiveMesh::PrimitiveMesh(detail::PrimitiveMeshType type, const std::string& texturePath)
-    : type(type)
-{
-    // Normalize: always use only the filename
-    fs::path cleanPath = fs::path(texturePath).filename();
-    this->texturePath = cleanPath.string();
-
-    geometry = PrimitiveGeometry::Create(type, X_SEGMENTS, Y_SEGMENTS);
-    mesh.Upload(geometry);
-    loadTexture(this->texturePath);
-}
-
-detail::PrimitiveMesh::PrimitiveMesh(detail::PrimitiveMeshType type, const std::string& texturePath, unsigned int xSeg, unsigned int ySeg)
-    : type(type), X_SEGMENTS(xSeg), Y_SEGMENTS(ySeg)
-{
-    // Normalize: always use only the filename
-    fs::path cleanPath = fs::path(texturePath).filename();
-    this->texturePath = cleanPath.string();
-
-    geometry = PrimitiveGeometry::Create(type, X_SEGMENTS, Y_SEGMENTS);
-    mesh.Upload(geometry);
-    loadTexture(this->texturePath);
-}
-
-
-// ---------------- Destructor ----------------
-detail::PrimitiveMesh::~PrimitiveMesh() {
-    if (textureID) glDeleteTextures(1, &textureID);
-}
-
-
-// ---------------- Mesh Construction Dispatcher ----------------
-// Selects the appropriate setup function to generate vertex/index buffers
-// and configure the VAO/VBO/EBO for this primitive type.
-//void detail::PrimitiveMesh::constructShapeMesh() {
-//    switch (type) {
-//        case detail::PrimitiveMeshType::Cube:
-//            setupCube();
-//            std::cout << "[DEBUG] Constructed Cube: VAO=" << VAO
-//                      << ", indexCount=" << indexCount << std::endl;
-//            break;
-//        case detail::PrimitiveMeshType::Sphere:
-//            setupSphere();
-//            std::cout << "[DEBUG] Constructed Sphere: VAO=" << VAO
-//                      << ", indexCount=" << indexCount
-//                      << ", Segments=" << X_SEGMENTS << "x" << Y_SEGMENTS << std::endl;
-//            break;
-//        case detail::PrimitiveMeshType::TriangularPrism:
-//            setupTriangularPrism();
-//            std::cout << "[DEBUG] Constructed TriangularPrism: VAO=" << VAO
-//                      << ", indexCount=" << indexCount << std::endl;
-//            break;
-//        case detail::PrimitiveMeshType::Triangle:
- //           setupTriangle();
-//            std::cout << "[DEBUG] Constructed Triangle: VAO=" << VAO
-//                      << ", indexCount=" << indexCount << std::endl;
-//            break;
-//            case detail::PrimitiveMeshType::Plane:
-//            setupPlane();
-//            std::cout << "[DEBUG] Constructed Plane: VAO=" << VAO
-//                      << ", indexCount=" << indexCount << std::endl;
-//            break;
-//            case detail::PrimitiveMeshType::Slab:
-//            setupSlab();
-//            std::cout << "[DEBUG] Constructed Slab: VAO=" << VAO
-//                      << ", indexCount=" << indexCount << std::endl;
-//            break;
-//        default:
- //           std::cerr << "[DEBUG] Unknown primitive type!" << std::endl;
-//            break;
-//    }
-
-    // Optional: print texture ID if already loaded (0 if not yet)
- //   std::cout << "[DEBUG] TextureID=" << textureID << std::endl;
-//}
-
-// -----------------------------------------------------------------------------
-// Update all setupXXX() functions to fill localVertices (not a local variable)
-// -----------------------------------------------------------------------------
 
 namespace {
 MeshData TypedMeshData(const std::vector<float>& values, std::vector<unsigned int> indices) {
@@ -155,7 +52,7 @@ MeshData TypedMeshData(const std::vector<float>& values, std::vector<unsigned in
 }
 
 // ---------------- Triangle setup ----------------
-MeshData detail::PrimitiveGeometry::CreateTriangle() {
+MeshData MeshGeneration::CreateTriangle() {
     //std::vector<float> vertices = {
     std::vector<float> localVertices = {
         // positions       // normals       // texcoords
@@ -170,7 +67,7 @@ MeshData detail::PrimitiveGeometry::CreateTriangle() {
 }
 
 // ---------------- Plane setup ----------------
-MeshData detail::PrimitiveGeometry::CreatePlane() {
+MeshData MeshGeneration::CreatePlane() {
     float h = 0.5f; // half size, makes a 1x1 unit plane
 
     //std::vector<float> vertices = {
@@ -191,7 +88,7 @@ MeshData detail::PrimitiveGeometry::CreatePlane() {
 }
 
 // ---------------- Slab setup ----------------
-MeshData detail::PrimitiveGeometry::CreateSlab() {
+MeshData MeshGeneration::CreateSlab() {
     float width  = 1.0f;
     float depth  = 1.0f;
     float height = 0.1f;
@@ -258,7 +155,7 @@ MeshData detail::PrimitiveGeometry::CreateSlab() {
 
 
 // ---------------- Cube setup ----------------
-MeshData detail::PrimitiveGeometry::CreateCube() {
+MeshData MeshGeneration::CreateCube() {
     //std::vector<float> vertices = {
     std::vector<float> localVertices = {
         // positions         // normals        // texcoords
@@ -301,7 +198,7 @@ MeshData detail::PrimitiveGeometry::CreateCube() {
 }
 
 // ---------------- Sphere setup ----------------
-MeshData detail::PrimitiveGeometry::CreateSphere (unsigned int X_SEGMENTS, unsigned int Y_SEGMENTS) {
+MeshData MeshGeneration::CreateSphere (unsigned int X_SEGMENTS, unsigned int Y_SEGMENTS) {
     std::vector<float> localVertices;
     std::vector<unsigned int> indices;
     const float PI = 3.14159265359f;
@@ -351,7 +248,7 @@ MeshData detail::PrimitiveGeometry::CreateSphere (unsigned int X_SEGMENTS, unsig
 
 
 
-MeshData detail::PrimitiveGeometry::CreateTriangularPrism() {
+MeshData MeshGeneration::CreateTriangularPrism() {
     float h = 1.0f;        // prism height along Y
     float halfBase = 0.5f; // triangle base along X
     float halfDepth = 0.5f; // triangle depth along Z
@@ -436,81 +333,79 @@ MeshData detail::PrimitiveGeometry::CreateTriangularPrism() {
 
 
 
-// ---------------- Texture loading ----------------
-void detail::PrimitiveMesh::loadTexture(const std::string& path) {
-    // Resolve absolute path relative to current directory
-    fs::path texPath = ResolveAssetPath(path, "textures");
-    std::cout << "[DEBUG] Attempting to load texture: " << texPath << std::endl;
+MeshSource MeshSources::Triangle() { return TriangleMeshSource{}; }
+MeshSource MeshSources::Plane() { return PlaneMeshSource{}; }
+MeshSource MeshSources::Cube() { return CubeMeshSource{}; }
+MeshSource MeshSources::Slab() { return SlabMeshSource{}; }
+MeshSource MeshSources::TriangularPrism() { return TriangularPrismMeshSource{}; }
+MeshSource MeshSources::Sphere(unsigned int x, unsigned int y) { return SphereMeshSource{x, y}; }
+MeshSource MeshSources::Terrain(const TerrainMeshSource& source) { return source; }
 
-    glGenTextures(1, &textureID);
-    glBindTexture(GL_TEXTURE_2D, textureID);
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-    if (!fs::exists(texPath)) {
-        std::cerr << "[ERROR] Texture file not found: " << texPath << std::endl;
-
-        // Create a simple 2x2 checkerboard fallback texture
-        unsigned char checker[16] = {
-            255,255,255, 0,0,0,
-            0,0,0,       255,255,255
-        };
-
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 2, 2, 0, GL_RGB, GL_UNSIGNED_BYTE, checker);
-        glGenerateMipmap(GL_TEXTURE_2D);
-        return;
-    }
-
-    int width, height, nrChannels;
-    stbi_set_flip_vertically_on_load(true);
-    unsigned char* data = stbi_load(texPath.string().c_str(), &width, &height, &nrChannels, 0);
-
-    if (data) {
-        GLenum format = (nrChannels == 1) ? GL_RED : (nrChannels == 3) ? GL_RGB : GL_RGBA;
-        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
-        glGenerateMipmap(GL_TEXTURE_2D);
-        std::cout << "[DEBUG] Loaded texture successfully: " << texPath << std::endl;
-    } else {
-        std::cerr << "[ERROR] stbi_load failed for: " << texPath
-                  << " (file not found or unsupported format)" << std::endl;
-
-        // Fallback 2x2 checkerboard
-        unsigned char checker[16] = {
-            255,255,255, 0,0,0,
-            0,0,0,       255,255,255
-        };
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 2, 2, 0, GL_RGB, GL_UNSIGNED_BYTE, checker);
-        glGenerateMipmap(GL_TEXTURE_2D);
-    }
-
-    stbi_image_free(data);
+MeshData MeshFactory::Create(const MeshSource& source) {
+    return std::visit([](const auto& definition) -> MeshData {
+        using T = std::decay_t<decltype(definition)>;
+        if constexpr (std::is_same_v<T, TriangleMeshSource>) return MeshGeneration::CreateTriangle();
+        else if constexpr (std::is_same_v<T, PlaneMeshSource>) return MeshGeneration::CreatePlane();
+        else if constexpr (std::is_same_v<T, CubeMeshSource>) return MeshGeneration::CreateCube();
+        else if constexpr (std::is_same_v<T, SlabMeshSource>) return MeshGeneration::CreateSlab();
+        else if constexpr (std::is_same_v<T, TriangularPrismMeshSource>) return MeshGeneration::CreateTriangularPrism();
+        else if constexpr (std::is_same_v<T, SphereMeshSource>) return MeshGeneration::CreateSphere(definition.xSegments, definition.ySegments);
+        else return TerrainGeometry::CreateMeshData(definition);
+    }, source);
 }
 
-MeshData detail::PrimitiveGeometry::Create(PrimitiveMeshType type, unsigned int xSegments, unsigned int ySegments) {
- switch(type) {
- case PrimitiveMeshType::Cube:return CreateCube(); case PrimitiveMeshType::TriangularPrism:return CreateTriangularPrism();
- case PrimitiveMeshType::Sphere:return CreateSphere(xSegments,ySegments); case PrimitiveMeshType::Triangle:return CreateTriangle();
- case PrimitiveMeshType::Plane:return CreatePlane(); case PrimitiveMeshType::Slab:return CreateSlab(); } return {};
+MeshObject::MeshObject(MeshSource definition, const std::string& path)
+    : source(std::move(definition)), geometry(MeshFactory::Create(source)), mesh(geometry) {
+    SetTexturePath(path);
 }
-
-// ---------------- Draw ----------------
-void detail::PrimitiveMesh::draw() const {
-    glBindTexture(GL_TEXTURE_2D, textureID);
-    mesh.Draw();
-    glBindTexture(GL_TEXTURE_2D, 0);
+MeshObject::~MeshObject() { if (textureID) glDeleteTextures(1, &textureID); }
+MeshObject::MeshObject(MeshObject&& other) noexcept
+    : modelMatrix(other.modelMatrix), source(std::move(other.source)), geometry(std::move(other.geometry)),
+      mesh(std::move(other.mesh)), texturePath(std::move(other.texturePath)), textureID(other.textureID) {
+    other.textureID = 0;
 }
-
-void detail::PrimitiveMesh::drawWireframe() const {
-    mesh.Draw();
+MeshObject& MeshObject::operator=(MeshObject&& other) noexcept {
+    if (this == &other) return *this;
+    if (textureID) glDeleteTextures(1, &textureID);
+    modelMatrix = other.modelMatrix; source = std::move(other.source); geometry = std::move(other.geometry);
+    mesh = std::move(other.mesh); texturePath = std::move(other.texturePath); textureID = other.textureID;
+    other.textureID = 0; return *this;
 }
-
-bool detail::PrimitiveMesh::IntersectsSphere(const glm::vec3& center, float radius, glm::vec3* contactNormal) const {
- return IntersectsSphereMesh(center, radius, geometry, modelMatrix, contactNormal);
+void MeshObject::Draw() const { mesh.Draw(); }
+void MeshObject::DrawWireframe() const { mesh.Draw(); }
+bool MeshObject::IntersectsSphere(const glm::vec3& center, float radius, glm::vec3* normal) const {
+    return IntersectsSphereMesh(center, radius, geometry, modelMatrix, normal);
 }
-
-std::string detail::PrimitiveMesh::GetTypeName() const { switch(type) {
- case PrimitiveMeshType::Cube:return "Cube"; case PrimitiveMeshType::TriangularPrism:return "Triangular Prism"; case PrimitiveMeshType::Sphere:return "Sphere";
- case PrimitiveMeshType::Triangle:return "Triangle"; case PrimitiveMeshType::Plane:return "Plane"; case PrimitiveMeshType::Slab:return "Slab";} return "Unknown"; }
+void MeshObject::SetTexturePath(const std::string& path) {
+    texturePath = fs::path(path).filename().string();
+    ReloadTexture();
+}
+void MeshObject::ReloadTexture() {
+    if (textureID) glDeleteTextures(1, &textureID);
+    textureID = 0;
+    if (!texturePath.empty()) LoadTexture();
+}
+void MeshObject::LoadTexture() {
+    const fs::path path = ResolveAssetPath(texturePath, "textures");
+    glGenTextures(1, &textureID); glBindTexture(GL_TEXTURE_2D, textureID);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    int width, height, channels; stbi_set_flip_vertically_on_load(true);
+    unsigned char* pixels = stbi_load(path.string().c_str(), &width, &height, &channels, 0);
+    if (!pixels) { std::cerr << "Failed to load texture: " << path << '\n'; return; }
+    const GLenum format = channels == 1 ? GL_RED : channels == 3 ? GL_RGB : GL_RGBA;
+    glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, pixels);
+    glGenerateMipmap(GL_TEXTURE_2D); stbi_image_free(pixels);
+}
+std::string MeshObject::GetSourceName() const {
+    return std::visit([](const auto& definition) -> std::string {
+        using T = std::decay_t<decltype(definition)>;
+        if constexpr (std::is_same_v<T, TriangleMeshSource>) return "Triangle";
+        else if constexpr (std::is_same_v<T, PlaneMeshSource>) return "Plane";
+        else if constexpr (std::is_same_v<T, CubeMeshSource>) return "Cube";
+        else if constexpr (std::is_same_v<T, SlabMeshSource>) return "Slab";
+        else if constexpr (std::is_same_v<T, TriangularPrismMeshSource>) return "Triangular Prism";
+        else if constexpr (std::is_same_v<T, SphereMeshSource>) return "Sphere";
+        else return "Terrain";
+    }, source);
+}
