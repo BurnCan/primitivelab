@@ -3,7 +3,7 @@
 #include <glad/glad.h>
 #include <glm/glm.hpp>
 #include <string>
-#include <vector>
+#include "Mesh.h"
 
 enum class TerrainGeometryType { Flat, Heightmap };
 enum class TerrainPlane { XY, XZ, YZ };
@@ -14,6 +14,8 @@ struct TerrainConfig {
     float width = 20.0f, depth = 20.0f, heightScale = 1.0f;
     std::string heightmapPath;
 };
+
+namespace TerrainGeometry { MeshData CreateMeshData(const TerrainConfig& config); }
 
 class Terrain {
 public:
@@ -36,13 +38,10 @@ public:
     const TerrainConfig& GetConfig() const { return config; }
 
 private:
-    void GenerateMesh();
     TerrainConfig config;
 
-    GLuint VAO, VBO, EBO;
     GLuint textureID;
-    int indexCount;
     std::string texturePath;
-    std::vector<glm::vec3> collisionVertices;
-    std::vector<unsigned int> collisionIndices;
+    MeshData geometry;
+    Mesh mesh;
 };

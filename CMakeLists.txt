@@ -59,6 +59,7 @@ set(COMMON_INCLUDE
 # -------------------
 set(COMMON_SOURCES
     src/external/glad.c
+    src/Mesh.cpp
     src/Primitives.cpp
     src/SceneManager.cpp
     src/MaterialRegistry.cpp
