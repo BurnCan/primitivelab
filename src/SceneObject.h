@@ -6,7 +6,7 @@
 #include <utility>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-#include "Primitives.h"
+#include "MeshObject.h"
 #include "Terrain.h"
 #include "Skybox.h"
 
@@ -35,7 +35,9 @@ struct LightComponent {
     float intensity = 1.0f, range = 10.0f;
     float innerConeAngle = 20.0f, outerConeAngle = 30.0f;
 };
-using SceneObjectPayload = std::variant<std::monostate, Primitive2D, Primitive3D, Terrain, Skybox>;
+enum class SceneObjectType { Mesh, Light, Camera, Skybox };
+
+using SceneObjectPayload = std::variant<std::monostate, MeshObject, Terrain, Skybox>;
 
 class SceneObject {
 public:

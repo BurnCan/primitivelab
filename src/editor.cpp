@@ -1,4 +1,5 @@
 #include <glad/glad.h>
+#include "TextureUtils.h"
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -49,7 +50,7 @@ const std::string SHADER_DIR = ResolveAssetPath("texture/basic.vert", "shaders")
 static bool showCollisionMeshes = false;
 static bool showTerrainMesh = false;
 
-enum class SceneObjectType {
+enum class CreationOption {
     Triangle,
     Plane,
     Cube,
@@ -61,13 +62,13 @@ enum class SceneObjectType {
     Light
 };
 
-struct SceneObjectTypeOption {
-    SceneObjectType type;
+struct CreationOptionOption {
+    CreationOption type;
     const char* name;
 };
 
-static bool SceneObjectTypeGroup(const char* label, const SceneObjectTypeOption* options,
-                                 int optionCount, SceneObjectType& selectedType) {
+static bool CreationOptionGroup(const char* label, const CreationOptionOption* options,
+                                 int optionCount, CreationOption& selectedType) {
     bool selectionChanged = false;
     ImGui::TextDisabled("%s", label);
     ImGui::Indent();
@@ -232,9 +233,9 @@ if (sceneManager.loadScene(defaultScenePath)) {
 } else {
     std::cout << "No scene found, creating default one...\n";
 
-    sceneManager.AddPrimitive3D(Primitive3DType::Cube, "textures/brick.jpg");
-    sceneManager.AddPrimitive3D(Primitive3DType::TriangularPrism, "textures/wood.jpg");
-    sceneManager.AddPrimitive3D(Primitive3DType::Sphere, "textures/earth.jpg", 16, 16);
+    sceneManager.AddMesh(MeshSources::Cube(), "textures/brick.jpg");
+    sceneManager.AddMesh(MeshSources::TriangularPrism(), "textures/wood.jpg");
+    sceneManager.AddMesh(MeshSources::Sphere(16, 16), "textures/earth.jpg");
     sceneManager.AddLight().transform.position = {-2.0f, 1.0f, -2.0f};
 
     // Track it even if just created
@@ -529,65 +530,65 @@ static int sceneObjectSortMode = 0;
 const char* sceneObjectSortModes[] = {"Newest to Oldest", "Oldest to Newest"};
 if (!textureFiles.empty()) textureIndex = std::min(textureIndex, int(textureFiles.size()-1));
 const std::string creationTexture = textureFiles.empty() ? std::string{} : textureFiles[textureIndex];
-static SceneObjectType selectedSceneObjectType = SceneObjectType::Cube;
-static const SceneObjectTypeOption primitive2DTypes[] = {
-    {SceneObjectType::Triangle, "Triangle"},
-    {SceneObjectType::Plane, "Plane"}
+static CreationOption selectedCreationOption = CreationOption::Cube;
+static const CreationOptionOption primitive2DTypes[] = {
+    {CreationOption::Triangle, "Triangle"},
+    {CreationOption::Plane, "Plane"}
 };
-static const SceneObjectTypeOption primitive3DTypes[] = {
-    {SceneObjectType::Cube, "Cube"},
-    {SceneObjectType::TriangularPrism, "Triangular Prism"},
-    {SceneObjectType::Sphere, "Sphere"},
-    {SceneObjectType::Slab, "Slab"}
+static const CreationOptionOption primitive3DTypes[] = {
+    {CreationOption::Cube, "Cube"},
+    {CreationOption::TriangularPrism, "Triangular Prism"},
+    {CreationOption::Sphere, "Sphere"},
+    {CreationOption::Slab, "Slab"}
 };
-static const SceneObjectTypeOption environmentTypes[] = {
-    {SceneObjectType::Terrain, "Terrain"},
-    {SceneObjectType::Skybox, "Skybox"}
+static const CreationOptionOption environmentTypes[] = {
+    {CreationOption::Terrain, "Terrain"},
+    {CreationOption::Skybox, "Skybox"}
 };
-static const SceneObjectTypeOption lightingTypes[] = {
-    {SceneObjectType::Light, "Light"}
+static const CreationOptionOption lightingTypes[] = {
+    {CreationOption::Light, "Light"}
 };
 const char* selectedSceneObjectName = "Cube";
-for (const SceneObjectTypeOption& option : primitive2DTypes)
-    if (option.type == selectedSceneObjectType) selectedSceneObjectName = option.name;
-for (const SceneObjectTypeOption& option : primitive3DTypes)
-    if (option.type == selectedSceneObjectType) selectedSceneObjectName = option.name;
-for (const SceneObjectTypeOption& option : environmentTypes)
-    if (option.type == selectedSceneObjectType) selectedSceneObjectName = option.name;
-for (const SceneObjectTypeOption& option : lightingTypes)
-    if (option.type == selectedSceneObjectType) selectedSceneObjectName = option.name;
+for (const CreationOptionOption& option : primitive2DTypes)
+    if (option.type == selectedCreationOption) selectedSceneObjectName = option.name;
+for (const CreationOptionOption& option : primitive3DTypes)
+    if (option.type == selectedCreationOption) selectedSceneObjectName = option.name;
+for (const CreationOptionOption& option : environmentTypes)
+    if (option.type == selectedCreationOption) selectedSceneObjectName = option.name;
+for (const CreationOptionOption& option : lightingTypes)
+    if (option.type == selectedCreationOption) selectedSceneObjectName = option.name;
 
 ImGui::TextUnformatted("Add Object:");
 const float addButtonWidth = ImGui::CalcTextSize("Add").x + ImGui::GetStyle().FramePadding.x * 2.0f;
 ImGui::SetNextItemWidth(std::max(120.0f, ImGui::GetContentRegionAvail().x - addButtonWidth - ImGui::GetStyle().ItemSpacing.x));
-if (ImGui::BeginCombo("##SceneObjectType", selectedSceneObjectName)) {
-    SceneObjectTypeGroup("Primitives 2D", primitive2DTypes, 2, selectedSceneObjectType);
+if (ImGui::BeginCombo("##CreationOption", selectedSceneObjectName)) {
+    CreationOptionGroup("Primitives 2D", primitive2DTypes, 2, selectedCreationOption);
     ImGui::Separator();
-    SceneObjectTypeGroup("Primitives 3D", primitive3DTypes, 4, selectedSceneObjectType);
+    CreationOptionGroup("Primitives 3D", primitive3DTypes, 4, selectedCreationOption);
     ImGui::Separator();
-    SceneObjectTypeGroup("Environment", environmentTypes, 2, selectedSceneObjectType);
+    CreationOptionGroup("Environment", environmentTypes, 2, selectedCreationOption);
     ImGui::Separator();
-    SceneObjectTypeGroup("Lighting", lightingTypes, 1, selectedSceneObjectType);
+    CreationOptionGroup("Lighting", lightingTypes, 1, selectedCreationOption);
     ImGui::EndCombo();
 }
 ImGui::SameLine();
-const bool skyboxAlreadyExists = selectedSceneObjectType == SceneObjectType::Skybox && sceneManager.GetSkybox();
+const bool skyboxAlreadyExists = selectedCreationOption == CreationOption::Skybox && sceneManager.GetSkybox();
 ImGui::BeginDisabled(skyboxAlreadyExists);
 if (ImGui::Button("Add")) {
-    switch (selectedSceneObjectType) {
-        case SceneObjectType::Triangle: sceneManager.AddPrimitive2D(Primitive2DType::Triangle, creationTexture); break;
-        case SceneObjectType::Plane: sceneManager.AddPrimitive2D(Primitive2DType::Plane, creationTexture); break;
-        case SceneObjectType::Cube: sceneManager.AddPrimitive3D(Primitive3DType::Cube, creationTexture); break;
-        case SceneObjectType::TriangularPrism: sceneManager.AddPrimitive3D(Primitive3DType::TriangularPrism, creationTexture); break;
-        case SceneObjectType::Sphere: sceneManager.AddPrimitive3D(Primitive3DType::Sphere, creationTexture); break;
-        case SceneObjectType::Slab: sceneManager.AddPrimitive3D(Primitive3DType::Slab, creationTexture); break;
-        case SceneObjectType::Terrain: {
+    switch (selectedCreationOption) {
+        case CreationOption::Triangle: sceneManager.AddMesh(MeshSources::Triangle(), creationTexture); break;
+        case CreationOption::Plane: sceneManager.AddMesh(MeshSources::Plane(), creationTexture); break;
+        case CreationOption::Cube: sceneManager.AddMesh(MeshSources::Cube(), creationTexture); break;
+        case CreationOption::TriangularPrism: sceneManager.AddMesh(MeshSources::TriangularPrism(), creationTexture); break;
+        case CreationOption::Sphere: sceneManager.AddMesh(MeshSources::Sphere(), creationTexture); break;
+        case CreationOption::Slab: sceneManager.AddMesh(MeshSources::Slab(), creationTexture); break;
+        case CreationOption::Terrain: {
             auto& object = sceneManager.AddTerrain();
             std::get<Terrain>(object.payload).SetTexturePath(creationTexture);
             break;
         }
-        case SceneObjectType::Skybox: sceneManager.AddSkybox(); break;
-        case SceneObjectType::Light: sceneManager.AddLight(); break;
+        case CreationOption::Skybox: sceneManager.AddSkybox(); break;
+        case CreationOption::Light: sceneManager.AddLight(); break;
     }
 }
 ImGui::EndDisabled();
@@ -626,14 +627,14 @@ for(std::size_t sourceIndex:displayOrder){auto& o=*objects[sourceIndex];ImGui::P
      if(ids.empty())ImGui::TextDisabled("No materials available");
      else{std::string preview=o.materialId.empty()?"(missing)":o.materialId;ImGui::SetNextItemWidth(-1.0f);if(ImGui::BeginCombo("##Material",preview.c_str())){for(const auto&id:ids){bool selected=id==o.materialId;if(ImGui::Selectable(id.c_str(),selected))o.materialId=id;if(selected)ImGui::SetItemDefaultFocus();}ImGui::EndCombo();}}
     }else{
-     std::visit([&](auto& payload){using T=std::decay_t<decltype(payload)>;if constexpr(std::is_same_v<T,Primitive2D>||std::is_same_v<T,Primitive3D>||std::is_same_v<T,Terrain>)TextureSelector(textureFiles,payload.GetTexturePath(),[&](const std::string& texture){payload.SetTexturePath(texture);});else if constexpr(std::is_same_v<T,Skybox>)SkyboxTextureSelector(skyboxNames,payload);},o.payload);
+     std::visit([&](auto& payload){using T=std::decay_t<decltype(payload)>;if constexpr(std::is_same_v<T,MeshObject>||std::is_same_v<T,Terrain>)TextureSelector(textureFiles,payload.GetTexturePath(),[&](const std::string& texture){payload.SetTexturePath(texture);});else if constexpr(std::is_same_v<T,Skybox>)SkyboxTextureSelector(skyboxNames,payload);},o.payload);
     }
     ImGui::EndTable();
    }
    if(o.renderMode==RenderMode::Material){auto warning=materials.GetWarning(o.materialId);if(!warning.empty())ImGui::TextWrapped("Material warning: %s",warning.c_str());}
   }
   std::visit([&](auto& payload){using T=std::decay_t<decltype(payload)>;
-   if constexpr(std::is_same_v<T,Primitive2D>||std::is_same_v<T,Primitive3D>){ImGui::Text("Primitive: %s",payload.GetTypeName().c_str());}
+   if constexpr(std::is_same_v<T,MeshObject>){ImGui::Text("Primitive: %s",payload.GetSourceName().c_str());}
    else if constexpr(std::is_same_v<T,Terrain>){auto& c=payload.GetConfig();ImGui::Text("Terrain: %s / %s",c.geometryType==TerrainGeometryType::Flat?"Flat":"Heightmap",c.plane==TerrainPlane::XY?"XY":c.plane==TerrainPlane::YZ?"YZ":"XZ");ImGui::Text("%d x %d segments, %.1f x %.1f",c.widthSegments,c.depthSegments,c.width,c.depth);}
    else if constexpr(std::is_same_v<T,Skybox>){
     if(o.renderMode==RenderMode::Texture){

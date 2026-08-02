@@ -1,3 +1,17 @@
+# Mesh architecture
+
+Mesh-based objects follow a single pipeline. A strongly typed `MeshSource`
+describes procedural geometry, `MeshFactory` creates retained CPU-side
+`MeshData`, and move-only `Mesh` owns the uploaded OpenGL buffers.
+`MeshObject` combines those pieces with texture and collision state. `Terrain`
+keeps its terrain-specific configuration while delegating geometry creation and
+rendering through the same pipeline.
+
+Imported models are the intended next `MeshSource` alternative. A model source
+and its real asset-loader visitor can be added to `MeshFactory` without changing
+`Mesh` or `MeshObject`; no placeholder source is exposed before that loader
+exists.
+
 # Dependencies
 
 PrimitiveLab requires:
